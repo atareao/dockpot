@@ -48,6 +48,11 @@ impl Database {
             .execute(&pool)
             .await
             .context("Failed to run sync migration")?;
+        let agents_table = include_str!("../migrations/20260823000003_agents.sql");
+        sqlx::raw_sql(agents_table)
+            .execute(&pool)
+            .await
+            .context("Failed to run agents migration")?;
 
         Ok(Self {
             pool,
@@ -284,5 +289,87 @@ impl Database {
             .await
             .context("Failed to set setting")?;
         Ok(())
+    }
+
+    // ───── Agents ─────
+
+    pub async fn list_agents(&self) -> Result<Vec<crate::models::Agent>> {
+        let rows = sqlx::query_as::<_, crate::models::AgentRow>(
+            "SELECT id, name, agent_type, host, port, tls_enabled, ca_cert, client_cert, client_key, \
+             description, enabled, created_at, updated_at FROM agents ORDER BY name",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to list agents")?;
+        Ok(rows.into_iter().map(|r| r.into()).collect())
+    }
+
+    pub async fn get_agent(&self, id: &str) -> Result<Option<crate::models::Agent>> {
+        let row = sqlx::query_as::<_, crate::models::AgentRow>(
+            "SELECT id, name, agent_type, host, port, tls_enabled, ca_cert, client_cert, client_key, \
+             description, enabled, created_at, updated_at FROM agents WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to get agent")?;
+        Ok(row.map(|r| r.into()))
+    }
+
+    pub async fn create_agent(&self, agent: &crate::models::Agent) -> Result<()> {
+        let now = chrono::Utc::now().to_rfc3339();
+        sqlx::query(
+            "INSERT INTO agents (id, name, agent_type, host, port, tls_enabled, ca_cert, client_cert, client_key, \
+             description, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&agent.id)
+        .bind(&agent.name)
+        .bind(&agent.agent_type)
+        .bind(&agent.host)
+        .bind(agent.port as i64)
+        .bind(agent.tls_enabled as i32)
+        .bind(&agent.ca_cert)
+        .bind(&agent.client_cert)
+        .bind(&agent.client_key)
+        .bind(&agent.description)
+        .bind(agent.enabled as i32)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await
+        .context("Failed to create agent")?;
+        Ok(())
+    }
+
+    pub async fn update_agent(&self, id: &str, agent: &crate::models::Agent) -> Result<bool> {
+        let now = chrono::Utc::now().to_rfc3339();
+        let rows = sqlx::query(
+            "UPDATE agents SET name=?, host=?, port=?, tls_enabled=?, ca_cert=?, client_cert=?, client_key=?, \
+             description=?, enabled=?, updated_at=? WHERE id=?",
+        )
+        .bind(&agent.name)
+        .bind(&agent.host)
+        .bind(agent.port as i64)
+        .bind(agent.tls_enabled as i32)
+        .bind(&agent.ca_cert)
+        .bind(&agent.client_cert)
+        .bind(&agent.client_key)
+        .bind(&agent.description)
+        .bind(agent.enabled as i32)
+        .bind(&now)
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .context("Failed to update agent")?;
+        Ok(rows.rows_affected() > 0)
+    }
+
+    pub async fn delete_agent(&self, id: &str) -> Result<bool> {
+        let rows = sqlx::query("DELETE FROM agents WHERE id=?")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .context("Failed to delete agent")?;
+        Ok(rows.rows_affected() > 0)
     }
 }

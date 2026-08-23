@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod config;
+pub mod convert;
 pub mod db;
 pub mod embed;
 pub mod git;

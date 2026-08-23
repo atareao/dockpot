@@ -5,7 +5,9 @@ use axum::Router;
 
 use crate::auth::AppState;
 
+pub mod agents;
 pub mod auth_routes;
+pub mod convert;
 pub mod logs;
 pub mod stacks;
 pub mod sync;
@@ -32,7 +34,15 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         .route("/api/stacks/validate", routing::post(stacks::validate_compose))
         .route("/api/stacks/{id}/pull", routing::post(stacks::pull))
         .route("/api/stacks/{id}/logs/ws", routing::get(logs::logs_ws_handler))
-        .route("/api/status", routing::get(stacks::dashboard_status));
+        .route("/api/status", routing::get(stacks::dashboard_status))
+        .route("/api/agents", routing::get(agents::list).post(agents::create))
+        .route(
+            "/api/agents/{id}",
+            routing::get(agents::get)
+                .put(agents::update)
+                .delete(agents::delete),
+        )
+        .route("/api/convert/docker-run", routing::post(convert::convert_docker_run));
 
     let sync_routes = Router::new()
         .route("/api/stacks/{id}/sync", routing::get(sync::get_config).put(sync::set_config))

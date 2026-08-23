@@ -63,6 +63,22 @@ export interface GitDiff {
   diff_text: string;
 }
 
+export interface Agent {
+  id: string;
+  name: string;
+  agent_type: string;
+  host: string;
+  port: number;
+  tls_enabled: boolean;
+  ca_cert: string | null;
+  client_cert: string | null;
+  client_key: string | null;
+  description: string | null;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export const api = {
   // Health
   health: () => request<{ status: string }>('/health'),
@@ -112,4 +128,20 @@ export const api = {
 
   // Me
   me: () => request<{ sub: string; email?: string; name?: string }>('/api/me'),
+
+  // Convert
+  convertDockerRun: (command: string, serviceName?: string) =>
+    request<{ valid: boolean; compose?: string; error?: string; service_name?: string }>('/api/convert/docker-run', {
+      method: 'POST',
+      body: JSON.stringify({ command, service_name: serviceName }),
+    }),
+
+  // Agents
+  listAgents: () => request<Agent[]>('/api/agents'),
+  getAgent: (id: string) => request<Agent>(`/api/agents/${id}`),
+  createAgent: (data: { name: string; host: string; port?: number; description?: string }) =>
+    request<Agent>('/api/agents', { method: 'POST', body: JSON.stringify(data) }),
+  updateAgent: (id: string, data: { name: string; host: string; port?: number; description?: string }) =>
+    request<Agent>(`/api/agents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteAgent: (id: string) => request<void>(`/api/agents/${id}`, { method: 'DELETE' }),
 };

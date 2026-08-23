@@ -126,3 +126,77 @@ pub struct GitDiff {
     pub deletions: u64,
     pub diff_text: String,
 }
+
+// ───── Agent ─────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Agent {
+    pub id: String,
+    pub name: String,
+    pub agent_type: String,
+    pub host: String,
+    pub port: u16,
+    pub tls_enabled: bool,
+    pub ca_cert: Option<String>,
+    pub client_cert: Option<String>,
+    pub client_key: Option<String>,
+    pub description: Option<String>,
+    pub enabled: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct AgentRow {
+    pub id: String,
+    pub name: String,
+    pub agent_type: String,
+    pub host: String,
+    pub port: i64,
+    pub tls_enabled: i32,
+    pub ca_cert: Option<String>,
+    pub client_cert: Option<String>,
+    pub client_key: Option<String>,
+    pub description: Option<String>,
+    pub enabled: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<AgentRow> for Agent {
+    fn from(row: AgentRow) -> Self {
+        Agent {
+            id: row.id,
+            name: row.name,
+            agent_type: row.agent_type,
+            host: row.host,
+            port: row.port as u16,
+            tls_enabled: row.tls_enabled != 0,
+            ca_cert: row.ca_cert,
+            client_cert: row.client_cert,
+            client_key: row.client_key,
+            description: row.description,
+            enabled: row.enabled != 0,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateAgentRequest {
+    pub name: String,
+    pub host: String,
+    pub port: Option<u16>,
+    pub tls_enabled: Option<bool>,
+    pub ca_cert: Option<String>,
+    pub client_cert: Option<String>,
+    pub client_key: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DockerRunRequest {
+    pub command: String,
+    pub service_name: Option<String>,
+}

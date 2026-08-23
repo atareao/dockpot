@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Table, Button, Modal, Form, Input, App as AntApp, Typography, Space, Tag, Card, Spin, Layout,
+  Table, Button, Modal, Form, Input, App as AntApp, Typography, Space, Tag, Card, Spin, Layout, Alert,
 } from 'antd';
-import { PlusOutlined, PlayCircleOutlined, StopOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, PlayCircleOutlined, StopOutlined, ReloadOutlined, SwapOutlined } from '@ant-design/icons';
 import { api, Stack } from '../api/http';
 
 const { Title } = Typography;
@@ -13,6 +13,12 @@ export function Stacks() {
   const [stacks, setStacks] = useState<Stack[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [convertModalOpen, setConvertModalOpen] = useState(false);
+  const [dockerRunCmd, setDockerRunCmd] = useState('');
+  const [convertedCompose, setConvertedCompose] = useState('');
+  const [convertValid, setConvertValid] = useState(false);
+  const [convertError, setConvertError] = useState('');
+  const [convertLoading, setConvertLoading] = useState(false);
   const [form] = Form.useForm();
   const { message } = AntApp.useApp();
   const navigate = useNavigate();
@@ -48,6 +54,46 @@ export function Stacks() {
       if (action === 'start') await api.startStack(id);
       else if (action === 'stop') await api.stopStack(id);
       else await api.restartStack(id);
+      loadStacks();
+    } catch (e: any) {
+      message.error('Error: ' + e.message);
+    }
+  };
+
+  const handleConvert = async () => {
+    if (!dockerRunCmd.trim()) {
+      message.error('Enter a docker run command');
+      return;
+    }
+    try {
+      setConvertLoading(true);
+      const result = await api.convertDockerRun(dockerRunCmd);
+      if (result.valid && result.compose) {
+        setConvertedCompose(result.compose);
+        setConvertValid(true);
+        setConvertError('');
+      } else {
+        setConvertedCompose('');
+        setConvertValid(false);
+        setConvertError(result.error || 'Conversion failed');
+      }
+    } catch (e: any) {
+      setConvertError(e.message);
+      setConvertValid(false);
+    } finally {
+      setConvertLoading(false);
+    }
+  };
+
+  const handleSaveFromConvert = async () => {
+    const name = prompt('Stack name:');
+    if (!name || !name.trim()) return;
+    try {
+      await api.createStack({ name: name.trim(), compose: convertedCompose });
+      message.success("Stack '" + name + "' created from docker run");
+      setConvertModalOpen(false);
+      setDockerRunCmd('');
+      setConvertedCompose('');
       loadStacks();
     } catch (e: any) {
       message.error('Error: ' + e.message);
@@ -143,6 +189,9 @@ export function Stacks() {
       <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Title level={3} style={{ margin: 0 }}>🐳 Dockpot</Title>
         <Space>
+          <Button icon={<SwapOutlined />} onClick={() => setConvertModalOpen(true)}>
+            Convert docker run
+          </Button>
           <Button icon={<ReloadOutlined />} onClick={loadStacks}>Refresh</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
             New Stack
@@ -178,6 +227,50 @@ export function Stacks() {
             <Input.TextArea rows={2} placeholder="Optional description" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="🔄 Convert docker run → compose.yaml"
+        open={convertModalOpen}
+        onCancel={() => {
+          setConvertModalOpen(false);
+          setDockerRunCmd('');
+          setConvertedCompose('');
+        }}
+        footer={null}
+        width={700}
+      >
+        <div style={{ marginBottom: 8 }}>
+          <label style={{ display: 'block', marginBottom: 4 }}>Paste your docker run command:</label>
+          <Input.TextArea
+            rows={3}
+            value={dockerRunCmd}
+            onChange={(e) => setDockerRunCmd(e.target.value)}
+            placeholder="docker run -d --name myapp -p 8080:80 nginx:alpine"
+          />
+        </div>
+        <Button type="primary" onClick={handleConvert} loading={convertLoading} style={{ marginBottom: 16 }}>
+          Convert
+        </Button>
+
+        {convertError && (
+          <Alert type="error" message={convertError} style={{ marginBottom: 8 }} showIcon />
+        )}
+
+        {convertedCompose && (
+          <>
+            <pre style={{
+              background: '#1e1e1e', color: '#d4d4d4', padding: 12,
+              borderRadius: 6, overflow: 'auto', maxHeight: 300, fontSize: 12,
+              marginBottom: 8,
+            }}>
+              {convertedCompose}
+            </pre>
+            <Button type="primary" onClick={handleSaveFromConvert}>
+              Save as Stack
+            </Button>
+          </>
+        )}
       </Modal>
     </Layout>
   );
