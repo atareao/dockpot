@@ -28,8 +28,9 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AntLayout style={{ minHeight: '100vh' }}>
       <Sider width={200} theme="light" style={{ borderRight: '1px solid #f0f0f0' }}>
-        <div style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', fontSize: 16 }}>
-          🐳 Dockpot
+        <div style={{ padding: '12px 16px', textAlign: 'center' }}>
+          <img src="/icon.svg" alt="Dockpot" width="36" height="36" style={{ verticalAlign: 'middle', marginRight: 4 }} />
+          <span style={{ fontWeight: 'bold', fontSize: 16, verticalAlign: 'middle' }}>Dockpot</span>
         </div>
         <Menu mode="inline" selectedKeys={[currentKey]} items={menuItems} onClick={({ key }) => navigate(key)} />
       </Sider>

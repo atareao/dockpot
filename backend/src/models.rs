@@ -299,3 +299,231 @@ pub struct CreateAgentRequest {
     pub client_key: Option<String>,
     pub description: Option<String>,
 }
+
+// ───── Tests ─────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Stack ──
+
+    #[test]
+    fn test_stack_from_row() {
+        let row = StackRow {
+            id: "abc-123".into(),
+            name: "test-stack".into(),
+            description: Some("A test".into()),
+            compose: "services:\n  app:\n    image: nginx".into(),
+            status: "running".into(),
+            path: "/data/stacks/abc-123".into(),
+            created_at: "2026-01-01T00:00:00Z".into(),
+            updated_at: "2026-01-01T00:00:00Z".into(),
+        };
+        let stack: Stack = row.into();
+        assert_eq!(stack.name, "test-stack");
+        assert_eq!(stack.description, Some("A test".into()));
+        assert_eq!(stack.status, "running");
+    }
+
+    #[test]
+    fn test_stack_default_status() {
+        let row = StackRow {
+            id: "x".into(), name: "x".into(), description: None,
+            compose: String::new(), status: "stopped".into(),
+            path: "/tmp".into(), created_at: String::new(), updated_at: String::new(),
+        };
+        let stack: Stack = row.into();
+        assert_eq!(stack.status, "stopped");
+    }
+
+    // ── StackSync ──
+
+    #[test]
+    fn test_stack_sync_from_row() {
+        let row = StackSyncRow {
+            stack_id: "s1".into(),
+            sync_type: "git_remote".into(),
+            remote_url: Some("https://github.com/user/repo.git".into()),
+            remote_branch: "main".into(),
+            auth_token: None,
+            last_commit: Some("abc123".into()),
+            last_synced_at: Some("2026-01-01T00:00:00Z".into()),
+            status: "synced".into(),
+        };
+        let sync: StackSync = row.into();
+        assert_eq!(sync.sync_type, "git_remote");
+        assert_eq!(sync.remote_url.unwrap(), "https://github.com/user/repo.git");
+        assert_eq!(sync.status, "synced");
+    }
+
+    #[test]
+    fn test_sync_default_branch() {
+        let row = StackSyncRow {
+            stack_id: "s2".into(), sync_type: "git_dir".into(),
+            remote_url: None, remote_branch: "main".into(),
+            auth_token: None, last_commit: None, last_synced_at: None,
+            status: "idle".into(),
+        };
+        let sync: StackSync = row.into();
+        assert_eq!(sync.remote_branch, "main");
+        assert!(sync.last_commit.is_none());
+    }
+
+    // ── Notifier ──
+
+    #[test]
+    fn test_notifier_from_row() {
+        let row = NotifierRow {
+            id: "n1".into(), name: "Telegram Alerts".into(),
+            notifier_type: "telegram".into(),
+            config_json: r#"{"bot_token":"xxx"}"#.into(),
+            enabled: 1, created_at: String::new(), updated_at: String::new(),
+        };
+        let n: Notifier = row.into();
+        assert_eq!(n.name, "Telegram Alerts");
+        assert_eq!(n.notifier_type, "telegram");
+        assert!(n.enabled);
+    }
+
+    #[test]
+    fn test_notifier_disabled() {
+        let row = NotifierRow {
+            id: "n2".into(), name: "Disabled".into(),
+            notifier_type: "ntfy".into(), config_json: "{}".into(),
+            enabled: 0, created_at: String::new(), updated_at: String::new(),
+        };
+        let n: Notifier = row.into();
+        assert!(!n.enabled);
+    }
+
+    #[test]
+    fn test_notifier_default_config() {
+        let row = NotifierRow {
+            id: "n3".into(), name: "Empty".into(),
+            notifier_type: "webhook".into(), config_json: "not-json".into(),
+            enabled: 1, created_at: String::new(), updated_at: String::new(),
+        };
+        let n: Notifier = row.into();
+        // Falls back to Null on invalid JSON
+        assert_eq!(n.config_json, serde_json::Value::Null);
+    }
+
+    // ── Agent ──
+
+    #[test]
+    fn test_agent_from_row() {
+        let row = AgentRow {
+            id: "a1".into(), name: "docker-01".into(),
+            agent_type: "docker".into(), host: "192.168.1.100".into(),
+            port: 2376, tls_enabled: 1,
+            ca_cert: Some("cert".into()), client_cert: None, client_key: None,
+            description: Some("Main host".into()), enabled: 1,
+            created_at: String::new(), updated_at: String::new(),
+        };
+        let a: Agent = row.into();
+        assert_eq!(a.name, "docker-01");
+        assert_eq!(a.host, "192.168.1.100");
+        assert_eq!(a.port, 2376);
+        assert!(a.tls_enabled);
+        assert!(a.enabled);
+    }
+
+    #[test]
+    fn test_agent_disabled() {
+        let row = AgentRow {
+            id: "a2".into(), name: "offline".into(),
+            agent_type: "docker".into(), host: "10.0.0.1".into(),
+            port: 2375, tls_enabled: 0,
+            ca_cert: None, client_cert: None, client_key: None,
+            description: None, enabled: 0,
+            created_at: String::new(), updated_at: String::new(),
+        };
+        let a: Agent = row.into();
+        assert!(!a.enabled);
+        assert!(!a.tls_enabled);
+    }
+
+    // ── DashboardStatus ──
+
+    #[test]
+    fn test_dashboard_status_serialize() {
+        let ds = DashboardStatus {
+            total_stacks: 5, running_stacks: 3, stopped_stacks: 2,
+            error_stacks: 0, docker_version: Some("24.0.7".into()),
+            docker_containers: 10, docker_images: 25,
+            recent_activity: vec![],
+        };
+        let json = serde_json::to_string(&ds).unwrap();
+        assert!(json.contains("\"total_stacks\":5"));
+        assert!(json.contains("\"docker_version\":\"24.0.7\""));
+    }
+
+    // ── EnvFile ──
+
+    #[test]
+    fn test_env_file_from_row() {
+        let row = EnvFileRow {
+            id: "e1".into(), stack_id: "s1".into(),
+            filename: ".env".into(), content: "DB_HOST=localhost".into(),
+            created_at: String::new(), updated_at: String::new(),
+        };
+        let env: EnvFile = row.into();
+        assert_eq!(env.filename, ".env");
+        assert_eq!(env.content, "DB_HOST=localhost");
+    }
+
+    // ── Requests ──
+
+    #[test]
+    fn test_create_stack_request_deserialize() {
+        let json = r#"{"name": "myapp", "description": "My app", "compose": "services:\n  app:\n    image: nginx"}"#;
+        let req: CreateStackRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.name, "myapp");
+        assert_eq!(req.description.unwrap(), "My app");
+    }
+
+    #[test]
+    fn test_create_stack_request_minimal() {
+        let json = r#"{"name": "myapp"}"#;
+        let req: CreateStackRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.name, "myapp");
+        assert!(req.compose.is_none());
+    }
+
+    #[test]
+    fn test_sync_config_request_defaults() {
+        let req = SyncConfigRequest {
+            sync_type: Some("git_remote".into()),
+            remote_url: Some("https://github.com/u/r.git".into()),
+            remote_branch: None,
+            auth_token: None,
+        };
+        assert_eq!(req.sync_type.unwrap(), "git_remote");
+    }
+
+    #[test]
+    fn test_git_diff_serialize() {
+        let diff = GitDiff {
+            files_changed: vec!["compose.yaml".into()],
+            additions: 5,
+            deletions: 2,
+            diff_text: "+hello\n-world\n".into(),
+        };
+        let json = serde_json::to_string(&diff).unwrap();
+        assert!(json.contains("\"additions\":5"));
+    }
+
+    // ── StackStats ──
+
+    #[test]
+    fn test_stack_stats_serialize() {
+        let stats = StackStats {
+            stack_id: "s1".into(),
+            last_started_at: Some("2026-01-01T00:00:00Z".into()),
+            total_running_seconds: 3600,
+        };
+        let json = serde_json::to_string(&stats).unwrap();
+        assert!(json.contains("\"total_running_seconds\":3600"));
+    }
+}

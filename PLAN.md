@@ -232,9 +232,17 @@ CREATE TABLE settings (
 - [-] Agentes remotos (gestión multi-host)
 - [-] Status pages públicas
 
-### Pendiente (implementado)
+### Plantillas ✅
+- ✅ Template library con 8 plantillas (nginx, postgres, redis, traefik, mariadb, mongodb, node-app, portainer)
+- ✅ Variables editables con defaults por plantilla
+- ✅ Preview en vivo al rellenar variables
+- ✅ Endpoints /api/templates (GET list / GET by name / POST render)
+- ✅ Crear stack desde template
 
-### Calidad de vida ✅
+### Diff visual ✅
+- ✅ Componente DiffViewer con coloreado tipo GitHub (+ verde / - rojo / @@ azul / numero linea)
+- ✅ Boton Diff en detalle del stack
+- ✅ Modal con diff completo contra HEAD
 - ✅ Dashboard con cards de resumen (stacks up/down, última actividad, Docker info)
 - ✅ Logs con coloreado por severidad (ERROR rojo, WARN amarillo)
 - ✅ Logs históricos (persistencia en BD + endpoint GET)

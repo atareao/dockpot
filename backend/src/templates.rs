@@ -220,3 +220,107 @@ pub fn fill_template(compose: &str, stack_name: &str, vars: &HashMap<String, Str
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_templates_has_nginx() {
+        let templates = get_templates();
+        assert!(templates.iter().any(|t| t.name == "nginx"));
+    }
+
+    #[test]
+    fn test_get_templates_has_eight() {
+        assert_eq!(get_templates().len(), 8);
+    }
+
+    #[test]
+    fn test_nginx_template_has_variables() {
+        let templates = get_templates();
+        let nginx = templates.iter().find(|t| t.name == "nginx").unwrap();
+        assert!(nginx.compose.contains("nginx:"));
+        assert!(!nginx.variables.is_empty());
+    }
+
+    #[test]
+    fn test_fill_template_replaces_stack_name() {
+        let compose = "container_name: ${STACK_NAME}-app\n";
+        let mut vars = HashMap::new();
+        let result = fill_template(compose, "myapp", &vars);
+        assert_eq!(result, "container_name: myapp-app\n");
+    }
+
+    #[test]
+    fn test_fill_template_replaces_variables() {
+        let compose = "image: nginx:${NGINX_TAG}\nport: ${PORT}";
+        let mut vars = HashMap::new();
+        vars.insert("NGINX_TAG".into(), "alpine".into());
+        vars.insert("PORT".into(), "8080".into());
+        let result = fill_template(compose, "test", &vars);
+        assert_eq!(result, "image: nginx:alpine\nport: 8080");
+    }
+
+    #[test]
+    fn test_fill_template_keeps_unset_vars() {
+        let compose = "version: '3'\nimage: ${UNSET_VAR}";
+        let vars = HashMap::new();
+        let result = fill_template(compose, "test", &vars);
+        // ${UNSET_VAR} should remain as-is since we only replace what we have
+        assert_eq!(result, compose);
+    }
+
+    #[test]
+    fn test_postgres_has_required_password() {
+        let templates = get_templates();
+        let pg = templates.iter().find(|t| t.name == "postgres").unwrap();
+        let pw_var = pg.variables.iter().find(|v| v.name == "POSTGRES_PASSWORD").unwrap();
+        assert!(pw_var.required);
+    }
+
+    #[test]
+    fn test_template_variable_serialize() {
+        let v = TemplateVariable {
+            name: "TEST_VAR".into(),
+            description: "A test".into(),
+            default: "default".into(),
+            required: true,
+        };
+        let json = serde_json::to_string(&v).unwrap();
+        assert!(json.contains("\"required\":true"));
+    }
+
+    #[test]
+    fn test_all_templates_have_category() {
+        for t in get_templates() {
+            assert!(!t.category.is_empty(), "Template '{}' has no category", t.name);
+        }
+    }
+
+    #[test]
+    fn test_traefik_has_letsencrypt() {
+        let templates = get_templates();
+        let traefik = templates.iter().find(|t| t.name == "traefik").unwrap();
+        assert!(traefik.compose.contains("letsencrypt"));
+    }
+
+    #[test]
+    fn test_mariadb_has_two_required() {
+        let tpl = crate::templates::get_templates();
+        let mariadb = tpl.iter().find(|t| t.name == "mariadb").unwrap();
+        let required: Vec<_> = mariadb.variables.iter().filter(|v| v.required).collect();
+        assert_eq!(required.len(), 2);
+    }
+
+    #[test]
+    fn test_fill_template_multiple_vars() {
+        let compose = "image: ${IMAGE}:${TAG}\nport: ${PORT}";
+        let mut vars = HashMap::new();
+        vars.insert("IMAGE".into(), "nginx".into());
+        vars.insert("TAG".into(), "latest".into());
+        vars.insert("PORT".into(), "80".into());
+        let result = fill_template(compose, "web", &vars);
+        assert_eq!(result, "image: nginx:latest\nport: 80");
+    }
+}

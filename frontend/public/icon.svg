@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="potGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#099cec"/>
+      <stop offset="100%" stop-color="#0675b3"/>
+    </linearGradient>
+    <linearGradient id="steamGrad" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#099cec" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#099cec" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Sombra -->
+  <ellipse cx="256" cy="420" rx="160" ry="20" fill="#00000020"/>
+
+  <!-- Cuerpo de la olla (vista 3/4, fondo) -->
+  <path d="M100 280 Q100 400 160 410 L352 410 Q412 400 412 280 L412 260 L100 260 Z"
+        fill="url(#potGrad)" stroke="#055a8a" stroke-width="3"/>
+
+  <!-- Borde superior de la olla -->
+  <ellipse cx="256" cy="260" rx="156" ry="35" fill="#099cec" stroke="#055a8a" stroke-width="3"/>
+  <ellipse cx="256" cy="260" rx="156" ry="35" fill="none" stroke="#47b8f2" stroke-width="1.5" opacity="0.5"/>
+
+  <!-- Asas -->
+  <path d="M100 290 Q70 290 65 310 Q60 330 85 340"
+        fill="none" stroke="#0675b3" stroke-width="8" stroke-linecap="round"/>
+  <path d="M412 290 Q442 290 447 310 Q452 330 427 340"
+        fill="none" stroke="#0675b3" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- Contenedor 1 (nginx - azul) -->
+  <rect x="150" y="200" width="60" height="65" rx="4" fill="#e6f7ff" stroke="#099cec" stroke-width="2"/>
+  <rect x="150" y="200" width="60" height="12" rx="4" fill="#099cec"/>
+  <text x="180" y="218" font-family="monospace" font-size="8" fill="white" text-anchor="middle" font-weight="bold">NGINX</text>
+  <rect x="158" y="220" width="44" height="3" rx="1.5" fill="#47b8f2" opacity="0.6"/>
+  <rect x="158" y="228" width="44" height="3" rx="1.5" fill="#47b8f2" opacity="0.6"/>
+  <rect x="158" y="236" width="30" height="3" rx="1.5" fill="#47b8f2" opacity="0.6"/>
+  <circle cx="180" cy="250" r="6" fill="#52c41a" stroke="#389e0d" stroke-width="1.5"/>
+  <text x="180" y="253" font-family="monospace" font-size="7" fill="white" text-anchor="middle" font-weight="bold">✓</text>
+
+  <!-- Contenedor 2 (postgres - azul oscuro) -->
+  <rect x="230" y="190" width="60" height="75" rx="4" fill="#e6fffb" stroke="#13c2c2" stroke-width="2"/>
+  <rect x="230" y="190" width="60" height="12" rx="4" fill="#13c2c2"/>
+  <text x="260" y="208" font-family="monospace" font-size="7" fill="white" text-anchor="middle" font-weight="bold">POSTGRES</text>
+  <rect x="238" y="210" width="44" height="3" rx="1.5" fill="#87e8de" opacity="0.6"/>
+  <rect x="238" y="218" width="44" height="3" rx="1.5" fill="#87e8de" opacity="0.6"/>
+  <rect x="238" y="226" width="36" height="3" rx="1.5" fill="#87e8de" opacity="0.6"/>
+  <rect x="238" y="234" width="44" height="3" rx="1.5" fill="#87e8de" opacity="0.6"/>
+  <circle cx="260" cy="250" r="6" fill="#52c41a" stroke="#389e0d" stroke-width="1.5"/>
+  <text x="260" y="253" font-family="monospace" font-size="7" fill="white" text-anchor="middle" font-weight="bold">✓</text>
+
+  <!-- Contenedor 3 (redis - rojo) -->
+  <rect x="310" y="205" width="55" height="60" rx="4" fill="#fff2f0" stroke="#ff4d4f" stroke-width="2"/>
+  <rect x="310" y="205" width="55" height="12" rx="4" fill="#ff4d4f"/>
+  <text x="337" y="223" font-family="monospace" font-size="7" fill="white" text-anchor="middle" font-weight="bold">REDIS</text>
+  <rect x="318" y="225" width="39" height="3" rx="1.5" fill="#ffa39e" opacity="0.6"/>
+  <rect x="318" y="233" width="39" height="3" rx="1.5" fill="#ffa39e" opacity="0.6"/>
+  <rect x="318" y="241" width="25" height="3" rx="1.5" fill="#ffa39e" opacity="0.6"/>
+  <circle cx="337" cy="252" r="5" fill="#52c41a" stroke="#389e0d" stroke-width="1.5"/>
+  <text x="337" y="255" font-family="monospace" font-size="6" fill="white" text-anchor="middle" font-weight="bold">✓</text>
+
+  <!-- Asa superior (arco) -->
+  <path d="M180 195 Q256 140 332 195"
+        fill="none" stroke="#0675b3" stroke-width="8" stroke-linecap="round"/>
+  <path d="M180 195 Q256 145 332 195"
+        fill="none" stroke="#47b8f2" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Vapor (ballena Docker abstracta) -->
+  <g opacity="0.25">
+    <path d="M200 160 Q220 120 260 110 Q300 100 320 130 Q330 140 320 150 Q300 135 280 130 Q250 125 230 140 Z"
+          fill="#099cec"/>
+    <circle cx="340" cy="125" r="15" fill="#099cec"/>
+    <circle cx="355" cy="118" r="10" fill="#099cec"/>
+    <circle cx="368" cy="112" r="6" fill="#099cec"/>
+  </g>
+
+  <!-- Texto DOCKPOT -->
+  <text x="256" y="470" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="42" font-weight="800" fill="#099cec" text-anchor="middle" letter-spacing="4">
+    DOCKPOT
+  </text>
+  <text x="256" y="490" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="12" fill="#8c8c8c" text-anchor="middle" letter-spacing="6">
+    STACK MANAGER
+  </text>
+</svg>
