@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use axum::extract::State;
 use axum::routing;
 use axum::Router;
 
@@ -84,6 +85,22 @@ pub fn api_routes() -> Router<Arc<AppState>> {
     public.merge(protected).merge(sync_routes)
 }
 
-pub async fn health() -> axum::Json<serde_json::Value> {
-    axum::Json(serde_json::json!({"status": "ok"}))
+pub async fn health(
+    State(state): State<Arc<AppState>>,
+) -> axum::Json<serde_json::Value> {
+    let docker_ok = tokio::process::Command::new("docker")
+        .args(["info"])
+        .output()
+        .await
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    let db_ok = state.db.get_setting("_health").await.is_ok();
+
+    let status = if docker_ok && db_ok { "ok" } else if docker_ok { "degraded" } else { "error" };
+
+    axum::Json(serde_json::json!({
+        "status": status,
+        "docker": docker_ok,
+        "database": db_ok,
+    }))
 }

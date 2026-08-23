@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::Json;
 use axum::http::StatusCode;
 use serde_json::Value;
-use uuid::Uuid;
 
 use crate::auth::AppState;
 use crate::models::BackupSchedule;

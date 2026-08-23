@@ -115,7 +115,7 @@ export function Stacks() {
         </Space>
       </Header>
       <Content style={{ padding: 24 }}>
-        <Card>{loading ? <Spin size="large" style={{ display: 'block', margin: '40px auto' }} /> : <Table dataSource={stacks} columns={columns} rowKey="id" pagination={false} />}</Card>
+        <Card>{loading ? <Spin size="large" style={{ display: 'block', margin: '40px auto' }} /> : <Table dataSource={stacks} columns={columns} rowKey="id" pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (total) => `${total} stacks` }} />}</Card>
       </Content>
 
       <Modal title="New Stack" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => form.submit()}>
