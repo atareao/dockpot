@@ -124,6 +124,12 @@ async fn main() {
         sync_scheduler_loop(db_for_sync).await;
     });
 
+    // ───── Backup Scheduler ─────
+    let db_for_backup = db.clone();
+    tokio::spawn(async move {
+        backup_scheduler_loop(db_for_backup).await;
+    });
+
     // ───── Router ─────
     let state_for_middleware = app_state.clone();
     let app = routes::api_routes()
@@ -231,5 +237,44 @@ async fn sync_scheduler_loop(db: dockpot::db::Database) {
         }
 
         tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+    }
+}
+
+/// Periodic backup scheduler: runs on cron schedule
+async fn backup_scheduler_loop(db: dockpot::db::Database) {
+    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+    loop {
+        let schedule = match db.get_backup_schedule().await {
+            Ok(Some(s)) => s,
+            _ => {
+                tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+                continue;
+            }
+        };
+        if !schedule.enabled {
+            tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+            continue;
+        }
+
+        // Simple cron check: run once per day at the configured hour
+        // Parse cron "0 3 * * *" => run at 3:00
+        if let Some(last_run) = &schedule.last_run_at {
+            if let Ok(last) = chrono::DateTime::parse_from_rfc3339(last_run) {
+                let now = chrono::Utc::now();
+                let elapsed = now - last.with_timezone(&chrono::Utc);
+                if elapsed.num_hours() < 23 {
+                    tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+                    continue;
+                }
+            }
+        }
+
+        tracing::info!("⏰ Running scheduled backup...");
+        if let Err(e) = db.run_backup().await {
+            tracing::error!("❌ Scheduled backup failed: {}", e);
+            db.update_backup_status(&format!("error: {}", e)).await.ok();
+        }
+
+        tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
     }
 }

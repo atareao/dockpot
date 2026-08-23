@@ -46,6 +46,8 @@ impl Database {
         sqlx::raw_sql(agents_table).execute(&pool).await?;
         let features_table = include_str!("../migrations/20260823000004_features.sql");
         sqlx::raw_sql(features_table).execute(&pool).await?;
+        let backup_table = include_str!("../migrations/20260823000005_backup.sql");
+        sqlx::raw_sql(backup_table).execute(&pool).await?;
 
         Ok(Self {
             pool,
@@ -496,5 +498,99 @@ impl Database {
         let rows = sqlx::query("DELETE FROM agents WHERE id=?")
             .bind(id).execute(&self.pool).await?;
         Ok(rows.rows_affected() > 0)
+    }
+
+    // ───── Backup Schedule ─────
+
+    pub async fn get_backup_schedule(&self) -> Result<Option<BackupSchedule>> {
+        let row = sqlx::query_as::<_, BackupScheduleRow>(
+            "SELECT id, enabled, cron_expression, retention_days, include_git, include_env, \
+             last_run_at, last_status, created_at, updated_at FROM backup_schedules LIMIT 1",
+        )
+        .fetch_optional(&self.pool).await?;
+        Ok(row.map(BackupSchedule::from))
+    }
+
+    pub async fn upsert_backup_schedule(&self, s: &BackupSchedule) -> Result<()> {
+        let existing = self.get_backup_schedule().await?;
+        let id = existing.as_ref().map(|e| e.id.clone()).unwrap_or_else(|| s.id.clone());
+        let now = chrono::Utc::now().to_rfc3339();
+        sqlx::query(
+            "INSERT INTO backup_schedules (id, enabled, cron_expression, retention_days, include_git, include_env, \
+             last_run_at, last_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+             ON CONFLICT(id) DO UPDATE SET enabled=excluded.enabled, cron_expression=excluded.cron_expression, \
+             retention_days=excluded.retention_days, include_git=excluded.include_git, include_env=excluded.include_env, \
+             updated_at=excluded.updated_at",
+        )
+        .bind(&id).bind(s.enabled as i32).bind(&s.cron_expression).bind(s.retention_days)
+        .bind(s.include_git as i32).bind(s.include_env as i32)
+        .bind(&s.last_run_at).bind(&s.last_status).bind(&now).bind(&now)
+        .execute(&self.pool).await?;
+        Ok(())
+    }
+
+    pub async fn update_backup_status(&self, status: &str) -> Result<()> {
+        let now = chrono::Utc::now().to_rfc3339();
+        sqlx::query("UPDATE backup_schedules SET last_run_at=?, last_status=?")
+            .bind(&now).bind(status)
+            .execute(&self.pool).await?;
+        Ok(())
+    }
+
+    pub async fn run_backup(&self) -> Result<String, String> {
+        let schedule = self.get_backup_schedule().await
+            .map_err(|e| format!("DB error: {}", e))?;
+        let backup_dir = std::path::Path::new("data").join("backups");
+        tokio::fs::create_dir_all(&backup_dir).await
+            .map_err(|e| format!("Failed to create backup dir: {}", e))?;
+        let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+        let filename = format!("dockpot-backup-{}.zip", timestamp);
+        let output_path = backup_dir.join(&filename);
+        let tmp_dir = std::env::temp_dir().join(format!("dockpot-backup-{}", timestamp));
+        tokio::fs::create_dir_all(&tmp_dir).await
+            .map_err(|e| format!("Failed to create temp dir: {}", e))?;
+
+        let stacks = self.list_stacks().await.map_err(|e| format!("List stacks: {}", e))?;
+        for stack in &stacks {
+            let src = std::path::Path::new(&stack.path);
+            let dst = tmp_dir.join(&stack.name);
+            if src.exists() {
+                let _ = std::process::Command::new("cp")
+                    .args(["-r", src.to_str().unwrap_or(""), dst.to_str().unwrap_or("")])
+                    .output();
+            }
+        }
+        let db_src = std::path::Path::new("data/dockpot.db");
+        if db_src.exists() {
+            let db_dst = tmp_dir.join("dockpot.db");
+            let _ = tokio::fs::copy(db_src, &db_dst).await;
+        }
+        let _ = std::process::Command::new("zip")
+            .args(["-r", output_path.to_str().unwrap_or(""), "."])
+            .current_dir(&tmp_dir).output();
+        let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
+
+        if let Some(ref sched) = schedule {
+            let cutoff = chrono::Utc::now() - chrono::Duration::days(sched.retention_days);
+            if tokio::fs::try_exists(&backup_dir).await.unwrap_or(false) {
+                let mut dir = tokio::fs::read_dir(&backup_dir).await.unwrap();
+                while let Ok(Some(entry)) = dir.next_entry().await {
+                    if let Ok(meta) = entry.metadata().await {
+                        if meta.is_file() {
+                            if let Ok(modified) = meta.modified() {
+                                let modified: chrono::DateTime<chrono::Utc> = modified.into();
+                                if modified < cutoff {
+                                    tokio::fs::remove_file(entry.path()).await.ok();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        self.update_backup_status("ok").await.map_err(|e| format!("Status update: {}", e))?;
+        tracing::info!("📦 Backup created: {}", output_path.display());
+        self.append_logs("system", &format!("📦 Backup created: {}\n", filename), "info").await.ok();
+        Ok(output_path.to_string_lossy().to_string())
     }
 }

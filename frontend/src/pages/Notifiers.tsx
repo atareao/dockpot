@@ -222,7 +222,8 @@ export function Notifiers() {
           <Form.Item name="notifier_type" label="Type" rules={[{ required: true }]}>
             <Select placeholder="Select notifier type">
               <Select.Option value="telegram">Telegram</Select.Option>
-              <Select.Option value="ntfy">ntfy.sh</Select.Option>
+                            <Select.Option value="ntfy">ntfy</Select.Option>
+                            <Select.Option value="webhook">Webhook</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item

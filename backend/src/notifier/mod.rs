@@ -2,6 +2,7 @@ use serde_json::Value;
 
 pub mod telegram;
 pub mod ntfy;
+pub mod webhook;
 
 /// Send a notification through the appropriate channel
 pub async fn send_notification(
@@ -33,6 +34,13 @@ pub async fn send_notification(
                 .unwrap_or("https://ntfy.sh");
             let token = config.get("token").and_then(|v| v.as_str());
             ntfy::send(topic, server_url, token, title, message).await
+        }
+        "webhook" => {
+            let url = config
+                .get("url")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing url")?;
+            webhook::send(url, title, message).await
         }
         _ => Err(format!("Unknown notifier type: {}", notifier_type)),
     }

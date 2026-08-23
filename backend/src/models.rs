@@ -300,6 +300,53 @@ pub struct CreateAgentRequest {
     pub description: Option<String>,
 }
 
+// ───── Backup Schedule ─────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackupSchedule {
+    pub id: String,
+    pub enabled: bool,
+    pub cron_expression: String,
+    pub retention_days: i64,
+    pub include_git: bool,
+    pub include_env: bool,
+    pub last_run_at: Option<String>,
+    pub last_status: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct BackupScheduleRow {
+    pub id: String,
+    pub enabled: i32,
+    pub cron_expression: String,
+    pub retention_days: i64,
+    pub include_git: i32,
+    pub include_env: i32,
+    pub last_run_at: Option<String>,
+    pub last_status: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<BackupScheduleRow> for BackupSchedule {
+    fn from(row: BackupScheduleRow) -> Self {
+        BackupSchedule {
+            id: row.id,
+            enabled: row.enabled != 0,
+            cron_expression: row.cron_expression,
+            retention_days: row.retention_days,
+            include_git: row.include_git != 0,
+            include_env: row.include_env != 0,
+            last_run_at: row.last_run_at,
+            last_status: row.last_status,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
 // ───── Tests ─────
 
 #[cfg(test)]

@@ -26,13 +26,8 @@ pub async fn get_logs(
     let logs = state.db.get_logs(&stack_id, limit, offset).await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    // Format as array of {content, level, created_at}
     let result: Vec<serde_json::Value> = logs.into_iter().map(|(content, level, ts)| {
-        serde_json::json!({
-            "content": content,
-            "level": level,
-            "created_at": ts,
-        })
+        serde_json::json!({"content": content, "level": level, "created_at": ts})
     }).collect();
 
     Ok(Json(serde_json::json!(result)))

@@ -166,6 +166,12 @@ export const api = {
   syncDiff: (id: string) => request<GitDiff>(`/api/stacks/${id}/sync/diff`),
   syncStatus: (id: string) => request<SyncStatus>(`/api/stacks/${id}/sync/status`),
 
+  // Backup
+  getBackupConfig: () => request<any>('/api/backup/config'),
+  setBackupConfig: (data: { enabled?: boolean; cron_expression?: string; retention_days?: number }) =>
+    request<any>('/api/backup/config', { method: 'POST', body: JSON.stringify(data) }),
+  runBackup: () => request<{ status: string; path: string }>('/api/backup/run', { method: 'POST' }),
+
   // Me
   me: () => request<{ sub: string; email?: string; name?: string }>('/api/me'),
 

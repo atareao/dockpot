@@ -7,6 +7,7 @@ use crate::auth::AppState;
 
 pub mod agents;
 pub mod auth_routes;
+pub mod backup;
 pub mod convert;
 pub mod docker_info;
 pub mod env;
@@ -68,7 +69,10 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         // Templates
         .route("/api/templates", routing::get(templates::list_templates))
         .route("/api/templates/{name}", routing::get(templates::get_template))
-        .route("/api/templates/render", routing::post(templates::render_template));
+        .route("/api/templates/render", routing::post(templates::render_template))
+        // Backup
+        .route("/api/backup/config", routing::get(backup::get_config).post(backup::upsert_config))
+        .route("/api/backup/run", routing::post(backup::run_now));
 
     let sync_routes = Router::new()
         .route("/api/stacks/{id}/sync", routing::get(sync::get_config).put(sync::set_config))
