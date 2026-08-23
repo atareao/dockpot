@@ -307,3 +307,52 @@ pub async fn validate_compose(
         Err(e) => Ok(Json(serde_json::json!({"valid": false, "error": e.to_string()}))),
     }
 }
+
+pub async fn pull(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let stack = state
+        .db
+        .get_stack(&id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to get stack: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("Stack '{}' not found", id)))?;
+
+    let compose_path = format!("{}/compose.yaml", stack.path);
+
+    let output = tokio::process::Command::new("docker")
+        .args(["compose", "-f", &compose_path, "pull"])
+        .output()
+        .await
+        .map_err(|e| {
+            tracing::error!("Docker compose pull failed: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("Docker error: {}", e))
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, format!("Docker error: {}", stderr)));
+    }
+
+    tracing::info!("📥 Images pulled for stack '{}'", stack.name);
+    Ok(Json(serde_json::json!(stack)))
+}
+
+pub async fn dashboard_status(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let status = state
+        .db
+        .get_dashboard_status()
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to get dashboard status: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
+
+    Ok(Json(serde_json::json!(status)))
+}

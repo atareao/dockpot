@@ -27,7 +27,9 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         .route("/api/stacks/{id}/stop", routing::post(stacks::stop))
         .route("/api/stacks/{id}/restart", routing::post(stacks::restart))
         .route("/api/stacks/{id}/compose", routing::get(stacks::get_compose).put(stacks::update_compose))
-        .route("/api/stacks/validate", routing::post(stacks::validate_compose));
+        .route("/api/stacks/validate", routing::post(stacks::validate_compose))
+        .route("/api/stacks/{id}/pull", routing::post(stacks::pull))
+        .route("/api/status", routing::get(stacks::dashboard_status));
 
     public.merge(protected)
 }

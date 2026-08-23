@@ -65,6 +65,15 @@ export const api = {
     request<{ id: string; name: string; compose: string }>(`/api/stacks/${id}/compose`),
   updateCompose: (id: string, compose: string) =>
     request<Stack>(`/api/stacks/${id}/compose`, { method: 'PUT', body: JSON.stringify({ compose }) }),
+  validateCompose: (compose: string) =>
+    request<{ valid: boolean; error?: string }>('/api/stacks/validate', {
+      method: 'POST',
+      body: JSON.stringify({ compose }),
+    }),
+
+  // Pull images
+  pullStack: (id: string) =>
+    request<Stack>(`/api/stacks/${id}/pull`, { method: 'POST' }),
 
   // Status
   getStatus: () => request<DashboardStatus>('/api/status'),
