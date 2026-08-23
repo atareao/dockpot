@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Typography, Table, Button, Modal, Form, Input, Select, Switch,
   Space, Tag, Card, Spin, Layout, App as AntApp,
 } from 'antd';
 import {
   PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined,
-  CheckCircleOutlined, CloseCircleOutlined, PlayCircleOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons';
 import { api, Notifier } from '../api/http';
 

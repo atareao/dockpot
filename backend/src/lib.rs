@@ -7,3 +7,4 @@ pub mod git;
 pub mod models;
 pub mod notifier;
 pub mod routes;
+pub mod templates;

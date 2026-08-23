@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Typography, Card, Row, Col, Statistic, Spin, Table, Tag, Space, Layout, Alert, List,
+  Typography, Card, Row, Col, Statistic, Spin, Table, Tag, Layout, Alert,
 } from 'antd';
 import {
   ClusterOutlined, CheckCircleOutlined, StopOutlined, CloseCircleOutlined,

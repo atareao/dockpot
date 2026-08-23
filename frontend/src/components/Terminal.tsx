@@ -5,11 +5,33 @@ import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
 interface TerminalProps { stackId: string; stackName: string; height?: string | number; }
 
 function colorizeLine(line: string): React.ReactNode {
+  // Detect lines with a timestamp in brackets like [2024-01-01T12:00:00] or [12:00:00]
+  const timestampMatch = line.match(/^(\[[^\]]*\])\s*/);
   const lower = line.toUpperCase();
-  let color = '#c9d1d9';
-  if (lower.includes('ERROR') || lower.includes('FATAL') || line.includes('] ERROR')) color = '#ff6b6b';
-  else if (lower.includes('WARN') || lower.includes('WARNING')) color = '#ffd93d';
-  return <div style={{ color, fontFamily: "'Cascadia Code', 'Fira Code', monospace", fontSize: 12, lineHeight: 1.5 }}>{line}</div>;
+
+  let contentColor = '#c9d1d9';
+  if (lower.includes('ERROR') || lower.includes('FATAL') || line.includes('] ERROR')) {
+    contentColor = '#ff6b6b';
+  } else if (lower.includes('WARN') || lower.includes('WARNING')) {
+    contentColor = '#ffd93d';
+  }
+
+  if (timestampMatch) {
+    const timestamp = timestampMatch[1];
+    const rest = line.slice(timestampMatch[0].length);
+    return (
+      <div style={{ fontFamily: "'Cascadia Code', 'Fira Code', monospace", fontSize: 12, lineHeight: 1.5 }}>
+        <span style={{ color: '#555' }}>{timestamp} </span>
+        <span style={{ color: contentColor }}>{rest}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ color: contentColor, fontFamily: "'Cascadia Code', 'Fira Code', monospace", fontSize: 12, lineHeight: 1.5 }}>
+      {line}
+    </div>
+  );
 }
 
 export function Terminal({ stackId, stackName, height = 400 }: TerminalProps) {

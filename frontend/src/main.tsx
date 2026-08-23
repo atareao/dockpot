@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { ConfigProvider, App as AntApp, Layout as AntLayout, Menu, theme, Switch, Space } from 'antd';
 import esES from 'antd/locale/es_ES';
 import { ClusterOutlined, ApiOutlined, DashboardOutlined, BellOutlined, SunOutlined, MoonOutlined } from '@ant-design/icons';

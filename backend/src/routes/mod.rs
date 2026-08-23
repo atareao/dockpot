@@ -17,6 +17,7 @@ pub mod notifiers;
 pub mod stacks;
 pub mod stats;
 pub mod sync;
+pub mod templates;
 
 pub fn api_routes() -> Router<Arc<AppState>> {
     let public = Router::new()
@@ -63,7 +64,11 @@ pub fn api_routes() -> Router<Arc<AppState>> {
             routing::get(agents::get).put(agents::update).delete(agents::delete),
         )
         // Convert
-        .route("/api/convert/docker-run", routing::post(convert::convert_docker_run));
+        .route("/api/convert/docker-run", routing::post(convert::convert_docker_run))
+        // Templates
+        .route("/api/templates", routing::get(templates::list_templates))
+        .route("/api/templates/{name}", routing::get(templates::get_template))
+        .route("/api/templates/render", routing::post(templates::render_template));
 
     let sync_routes = Router::new()
         .route("/api/stacks/{id}/sync", routing::get(sync::get_config).put(sync::set_config))

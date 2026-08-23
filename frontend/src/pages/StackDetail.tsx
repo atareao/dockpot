@@ -1,17 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Typography, Spin, Button, Space, Tag, Card, Descriptions, App as AntApp, Layout,
-  Alert, Tabs, Switch, Modal,
+  Alert, Switch, Modal,
 } from 'antd';
 import {
   ArrowLeftOutlined, PlayCircleOutlined, StopOutlined, ReloadOutlined,
   CloudUploadOutlined, CheckCircleOutlined, CloseCircleOutlined,
-  DownloadOutlined, CodeOutlined, ConsoleOutlined, GithubOutlined,
+  DownloadOutlined, GithubOutlined,
 } from '@ant-design/icons';
 import { api, Stack, StackSync } from '../api/http';
 import { YamlEditor } from '../components/YamlEditor';
 import { Terminal } from '../components/Terminal';
+import { DiffViewer } from '../components/DiffViewer';
 
 const { Title, Text } = Typography;
 const { Content, Header } = Layout;
@@ -34,6 +35,8 @@ export function StackDetail() {
   const [notifierModalOpen, setNotifierModalOpen] = useState(false);
   const [envContent, setEnvContent] = useState('');
   const [envFilename, setEnvFilename] = useState('.env');
+  const [diffModalOpen, setDiffModalOpen] = useState(false);
+  const [diffData, setDiffData] = useState<any>(null);
   const [editMode, setEditMode] = useState(false);
   const [yamlValid, setYamlValid] = useState(true);
   const [yamlErrors, setYamlErrors] = useState<string[]>([]);
@@ -77,6 +80,17 @@ export function StackDetail() {
   };
 
   useEffect(() => { if (id) { loadEnvFiles(); loadNotifiers(); loadStats(); } }, [id]);
+
+  const handleShowDiff = async () => {
+    if (!id) return;
+    try {
+      const data = await api.syncDiff(id);
+      setDiffData(data);
+      setDiffModalOpen(true);
+    } catch (e: any) {
+      message.error('Diff failed: ' + e.message);
+    }
+  };
 
   const handleAction = async (action: 'start' | 'stop' | 'restart') => {
     if (!id) return;
@@ -242,6 +256,7 @@ export function StackDetail() {
         <Button icon={<DownloadOutlined />} onClick={() => api.exportStack(stack.id)}>
           Export
         </Button>
+        <Button icon={<CodeOutlined />} onClick={handleShowDiff}>Diff</Button>
       </Header>
       <Content style={{ padding: 24 }}>
         <Card size="small" style={{ marginBottom: 16 }}>
@@ -439,8 +454,9 @@ export function StackDetail() {
           }}
           width={600}
         >
-          <div style={{ marginBottom: 8 }}>
-            <label>Filename:</label>
+
+        <div style={{ marginBottom: 8 }}>
+          <label>Filename:</label>
             <input value={envFilename} onChange={(e) => setEnvFilename(e.target.value)}
               style={{ width: '100%', padding: '4px 8px', borderRadius: 4, border: '1px solid #d9d9d9', fontSize: 14 }}
             />
@@ -450,6 +466,25 @@ export function StackDetail() {
             style={{ width: '100%', fontFamily: 'monospace', fontSize: 13, padding: 8, borderRadius: 4, border: '1px solid #d9d9d9' }}
             placeholder="DB_HOST=localhost&#10;DB_PORT=5432"
           />
+        </Modal>
+
+        <Modal
+          title="📊 Git Diff"
+          open={diffModalOpen}
+          onCancel={() => setDiffModalOpen(false)}
+          footer={null}
+          width={800}
+        >
+          {diffData && (
+            <>
+              <Space style={{ marginBottom: 8 }}>
+                <Tag>{diffData.files_changed?.length || 0} files changed</Tag>
+                <Tag color="green">+{diffData.additions || 0}</Tag>
+                <Tag color="red">-{diffData.deletions || 0}</Tag>
+              </Space>
+              <DiffViewer diffText={diffData.diff_text || ''} height={400} />
+            </>
+          )}
         </Modal>
       </Content>
     </Layout>
