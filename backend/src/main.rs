@@ -118,6 +118,12 @@ async fn main() {
         event_tx: event_tx.clone(),
     });
 
+    // ───── Sync Scheduler ─────
+    let db_for_sync = db.clone();
+    tokio::spawn(async move {
+        sync_scheduler_loop(db_for_sync).await;
+    });
+
     // ───── Router ─────
     let state_for_middleware = app_state.clone();
     let app = routes::api_routes()
@@ -179,5 +185,51 @@ async fn shutdown_signal() {
     tokio::select! {
         _ = ctrl_c => {},
         _ = terminate => {},
+    }
+}
+
+/// Periodic sync scheduler: pulls remote changes for all git_remote stacks
+async fn sync_scheduler_loop(db: dockpot::db::Database) {
+    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+    loop {
+        let configs = match db.list_sync_configs().await {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!("Sync scheduler: failed to list configs: {}", e);
+                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                continue;
+            }
+        };
+
+        for sync in &configs {
+            if sync.sync_type != "git_remote" || sync.remote_url.is_none() {
+                continue;
+            }
+
+            let stack = match db.get_stack(&sync.stack_id).await {
+                Ok(Some(s)) => s,
+                _ => continue,
+            };
+
+            let repo_path = std::path::Path::new(&stack.path);
+            let repo = match git2::Repository::open(repo_path) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+
+            match dockpot::git::sync::pull(&repo, &sync.remote_branch) {
+                Ok(msg) => {
+                    let commit = dockpot::git::sync::head_commit(&repo).ok().flatten();
+                    db.update_sync_status(&sync.stack_id, "synced", commit.as_deref()).await.ok();
+                    tracing::debug!("Sync for '{}': {}", stack.name, msg);
+                }
+                Err(e) => {
+                    tracing::warn!("Sync failed for '{}': {}", stack.name, e);
+                    db.update_sync_status(&sync.stack_id, "conflict", None).await.ok();
+                }
+            }
+        }
+
+        tokio::time::sleep(std::time::Duration::from_secs(300)).await;
     }
 }

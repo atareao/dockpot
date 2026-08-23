@@ -7,9 +7,9 @@ import {
 import {
   ArrowLeftOutlined, PlayCircleOutlined, StopOutlined, ReloadOutlined,
   CloudUploadOutlined, CheckCircleOutlined, CloseCircleOutlined,
-  DownloadOutlined, CodeOutlined, ConsoleOutlined,
+  DownloadOutlined, CodeOutlined, ConsoleOutlined, GithubOutlined,
 } from '@ant-design/icons';
-import { api, Stack } from '../api/http';
+import { api, Stack, StackSync } from '../api/http';
 import { YamlEditor } from '../components/YamlEditor';
 import { Terminal } from '../components/Terminal';
 
@@ -25,6 +25,8 @@ export function StackDetail() {
   const [saving, setSaving] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [pulling, setPulling] = useState(false);
+  const [syncConfig, setSyncConfig] = useState<StackSync | null>(null);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [yamlValid, setYamlValid] = useState(true);
   const [yamlErrors, setYamlErrors] = useState<string[]>([]);
@@ -196,6 +198,20 @@ export function StackDetail() {
         >
           Update Images
         </Button>
+        <Button
+          icon={<GithubOutlined />}
+          onClick={() => {
+            setSyncModalOpen(true);
+            id && api.getSyncConfig(id).then(setSyncConfig).catch(() => {});
+          }}
+        >
+          Git Sync
+        </Button>
+        {syncConfig && syncConfig.sync_type !== 'none' && (
+          <Tag color={syncConfig.status === 'synced' ? 'green' : syncConfig.status === 'conflict' ? 'red' : 'orange'}>
+            {syncConfig.status}
+          </Tag>
+        )}
       </Header>
       <Content style={{ padding: 24 }}>
         <Card size="small" style={{ marginBottom: 16 }}>
@@ -300,7 +316,154 @@ export function StackDetail() {
         <Card title="📋 Live Logs" style={{ marginTop: 16 }}>
           <Terminal stackId={stack.id} stackName={stack.name} height={350} />
         </Card>
+
+        <Modal
+          title="⚙️ Git Sync Configuration"
+          open={syncModalOpen}
+          onCancel={() => setSyncModalOpen(false)}
+          footer={null}
+          width={500}
+        >
+          <SyncConfigForm
+            stackId={stack.id}
+            stackName={stack.name}
+            config={syncConfig}
+            onSaved={() => {
+              setSyncModalOpen(false);
+              id && api.getSyncConfig(id).then(setSyncConfig).catch(() => {});
+            }}
+          />
+        </Modal>
       </Content>
     </Layout>
+  );
+}
+
+// ───── Sync Config Form ─────
+
+function SyncConfigForm({ stackId, stackName, config, onSaved }: {
+  stackId: string;
+  stackName: string;
+  config: StackSync | null;
+  onSaved: () => void;
+}) {
+  const [syncType, setSyncType] = useState(config?.sync_type || 'none');
+  const [remoteUrl, setRemoteUrl] = useState(config?.remote_url || '');
+  const [remoteBranch, setRemoteBranch] = useState(config?.remote_branch || 'main');
+  const [authToken, setAuthToken] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const { message } = AntApp.useApp();
+
+  const handleSave = async () => {
+    try {
+      setSyncing(true);
+      await api.setSyncConfig(stackId, {
+        sync_type: syncType,
+        remote_url: remoteUrl || undefined,
+        remote_branch: remoteBranch || 'main',
+        auth_token: authToken || undefined,
+      });
+      message.success(`Sync config saved for '${stackName}'`);
+      onSaved();
+    } catch (e: any) {
+      message.error('Error: ' + e.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handlePull = async () => {
+    try {
+      setPulling(true);
+      const result = await api.syncPull(stackId);
+      message.success('🔽 ' + result.message);
+      onSaved();
+    } catch (e: any) {
+      message.error('Pull failed: ' + e.message);
+    } finally {
+      setPulling(false);
+    }
+  };
+
+  const handlePush = async () => {
+    try {
+      const result = await api.syncPush(stackId);
+      message.success('🔼 ' + result.message);
+      onSaved();
+    } catch (e: any) {
+      message.error('Push failed: ' + e.message);
+    }
+  };
+
+  return (
+    <Space direction="vertical" style={{ width: '100%' }}>
+      <div>
+        <label style={{ display: 'block', marginBottom: 4 }}>Sync Type</label>
+        <select
+          value={syncType}
+          onChange={(e) => setSyncType(e.target.value)}
+          style={{
+            width: '100%', padding: '4px 8px',
+            borderRadius: 4, border: '1px solid #d9d9d9', fontSize: 14,
+          }}
+        >
+          <option value="none">None</option>
+          <option value="git_dir">Local Git (no remote)</option>
+          <option value="git_remote">Remote Git</option>
+        </select>
+      </div>
+
+      {syncType === 'git_remote' && (
+        <>
+          <InputField label="Remote URL" value={remoteUrl} onChange={setRemoteUrl} placeholder="https://github.com/user/repo.git" />
+          <InputField label="Branch" value={remoteBranch} onChange={setRemoteBranch} placeholder="main" />
+          <InputField label="Auth Token (optional)" value={authToken} onChange={setAuthToken} placeholder="ghp_xxx..." type="password" />
+        </>
+      )}
+
+      <Space style={{ marginTop: 8 }}>
+        <Button type="primary" onClick={handleSave} loading={syncing}>
+          Save Config
+        </Button>
+        {syncType === 'git_remote' && (
+          <>
+            <Button onClick={handlePull} loading={pulling}>Pull</Button>
+            <Button onClick={handlePush}>Push</Button>
+          </>
+        )}
+      </Space>
+
+      {config && config.last_commit && (
+        <div style={{ marginTop: 8, fontSize: 12, color: '#888' }}>
+          Last commit: <code>{config.last_commit.substring(0, 12)}</code>
+          {config.last_synced_at && ` | ${new Date(config.last_synced_at).toLocaleString()}`}
+        </div>
+      )}
+    </Space>
+  );
+}
+
+function InputField({ label, value, onChange, placeholder, type = 'text' }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: string;
+}) {
+  return (
+    <div>
+      <label style={{ display: 'block', marginBottom: 4 }}>{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: '100%', padding: '4px 8px',
+          borderRadius: 4, border: '1px solid #d9d9d9', fontSize: 14,
+        }}
+      />
+    </div>
   );
 }

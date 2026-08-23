@@ -40,6 +40,29 @@ export interface DashboardStatus {
   stopped_stacks: number;
 }
 
+export interface StackSync {
+  stack_id: string;
+  sync_type: string;
+  remote_url: string | null;
+  remote_branch: string;
+  auth_token: string | null;
+  last_commit: string | null;
+  last_synced_at: string | null;
+  status: string;
+}
+
+export interface SyncStatus {
+  stack_id: string;
+  status: string;
+}
+
+export interface GitDiff {
+  files_changed: string[];
+  additions: number;
+  deletions: number;
+  diff_text: string;
+}
+
 export const api = {
   // Health
   health: () => request<{ status: string }>('/health'),
@@ -77,6 +100,15 @@ export const api = {
 
   // Status
   getStatus: () => request<DashboardStatus>('/api/status'),
+
+  // Sync
+  getSyncConfig: (id: string) => request<StackSync | null>(`/api/stacks/${id}/sync`),
+  setSyncConfig: (id: string, data: { sync_type?: string; remote_url?: string; remote_branch?: string; auth_token?: string }) =>
+    request<StackSync>(`/api/stacks/${id}/sync`, { method: 'PUT', body: JSON.stringify(data) }),
+  syncPull: (id: string) => request<{ message: string; commit?: string }>(`/api/stacks/${id}/sync/pull`, { method: 'POST' }),
+  syncPush: (id: string) => request<{ message: string; commit?: string }>(`/api/stacks/${id}/sync/push`, { method: 'POST' }),
+  syncDiff: (id: string) => request<GitDiff>(`/api/stacks/${id}/sync/diff`),
+  syncStatus: (id: string) => request<SyncStatus>(`/api/stacks/${id}/sync/status`),
 
   // Me
   me: () => request<{ sub: string; email?: string; name?: string }>('/api/me'),

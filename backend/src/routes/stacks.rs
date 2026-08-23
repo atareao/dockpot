@@ -7,6 +7,27 @@ use serde_json::Value;
 
 use crate::auth::AppState;
 use crate::models::{CreateStackRequest, UpdateStackRequest};
+use crate::git;
+
+/// Auto-commit changes if the stack has git sync enabled
+async fn auto_commit(state: &Arc<AppState>, id: &str, message: &str) {
+    if let Ok(Some(sync)) = state.db.get_sync_config(id).await {
+        if sync.sync_type != "none" {
+            if let Ok(Some(stack)) = state.db.get_stack(id).await {
+                let repo_path = std::path::Path::new(&stack.path);
+                if let Ok(repo) = git2::Repository::open(repo_path) {
+                    if let Err(e) = git::sync::commit_all(&repo, message) {
+                        tracing::warn!("Auto-commit failed for '{}': {}", stack.name, e);
+                    } else {
+                        tracing::info!("📝 Auto-commit for '{}': {}", stack.name, message);
+                        let commit = git::sync::head_commit(&repo).ok().flatten();
+                        state.db.update_sync_status(id, "pending", commit.as_deref()).await.ok();
+                    }
+                }
+            }
+        }
+    }
+}
 
 pub async fn list(
     State(state): State<Arc<AppState>>,
@@ -46,6 +67,10 @@ pub async fn create(
             tracing::error!("Failed to create stack: {}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
         })?;
+
+    tracing::info!("✅ Stack '{}' created", stack.name);
+
+    auto_commit(&state, &stack.id, &format!("dockpot: create stack '{}'", stack.name)).await;
 
     Ok(Json(serde_json::json!(stack)))
 }
@@ -100,6 +125,9 @@ pub async fn update(
     }
 
     let stack = state.db.get_stack(&id).await.unwrap().unwrap();
+
+    auto_commit(&state, &id, &format!("dockpot: update stack '{}'", stack.name)).await;
+
     Ok(Json(serde_json::json!(stack)))
 }
 
@@ -288,6 +316,8 @@ pub async fn update_compose(
         })?;
 
     tracing::info!("📝 Compose updated for stack '{}'", stack.name);
+
+    auto_commit(&state, &id, &format!("dockpot: update compose '{}'", stack.name)).await;
 
     let stack = state.db.get_stack(&id).await.unwrap().unwrap();
     Ok(Json(serde_json::json!(stack)))

@@ -6,7 +6,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use crate::models::{DashboardStatus, Stack, StackRow};
+use crate::models::{DashboardStatus, Stack, StackRow, StackSync, StackSyncRow};
 
 #[derive(Clone)]
 pub struct Database {
@@ -42,7 +42,12 @@ impl Database {
         sqlx::raw_sql(tables)
             .execute(&pool)
             .await
-            .context("Failed to run migrations")?;
+            .context("Failed to run initial migration")?;
+        let sync_table = include_str!("../migrations/20260823000002_sync.sql");
+        sqlx::raw_sql(sync_table)
+            .execute(&pool)
+            .await
+            .context("Failed to run sync migration")?;
 
         Ok(Self {
             pool,
@@ -97,12 +102,10 @@ impl Database {
         let id = Uuid::new_v4().to_string();
         let stacks_path = Path::new(&self.stacks_dir).join(&id);
 
-        // Create stack directory
         tokio::fs::create_dir_all(&stacks_path)
             .await
             .context("Failed to create stack directory")?;
 
-        // Write compose file
         let compose_path = stacks_path.join("compose.yaml");
         tokio::fs::write(&compose_path, compose)
             .await
@@ -151,7 +154,6 @@ impl Database {
         .await
         .context("Failed to update stack")?;
 
-        // Update compose file on disk
         if let Ok(Some(stack)) = self.get_stack(id).await {
             let compose_path = Path::new(&stack.path).join("compose.yaml");
             let _ = tokio::fs::write(&compose_path, compose).await;
@@ -173,7 +175,6 @@ impl Database {
     }
 
     pub async fn delete_stack(&self, id: &str) -> Result<bool> {
-        // Remove directory
         if let Ok(Some(stack)) = self.get_stack(id).await {
             let _ = tokio::fs::remove_dir_all(&stack.path).await;
         }
@@ -184,6 +185,70 @@ impl Database {
             .await
             .context("Failed to delete stack")?;
         Ok(rows.rows_affected() > 0)
+    }
+
+    // ───── Stack Sync ─────
+
+    pub async fn get_sync_config(&self, stack_id: &str) -> Result<Option<StackSync>> {
+        let row = sqlx::query_as::<_, StackSyncRow>(
+            "SELECT stack_id, sync_type, remote_url, remote_branch, auth_token, last_commit, last_synced_at, status \
+             FROM stack_sync WHERE stack_id = ?",
+        )
+        .bind(stack_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to get sync config")?;
+        Ok(row.map(StackSync::from))
+    }
+
+    pub async fn upsert_sync_config(&self, sync: &StackSync) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO stack_sync (stack_id, sync_type, remote_url, remote_branch, auth_token, last_commit, last_synced_at, status) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?) \
+             ON CONFLICT(stack_id) DO UPDATE SET \
+             sync_type=excluded.sync_type, remote_url=excluded.remote_url, \
+             remote_branch=excluded.remote_branch, auth_token=excluded.auth_token, \
+             last_commit=excluded.last_commit, last_synced_at=excluded.last_synced_at, \
+             status=excluded.status",
+        )
+        .bind(&sync.stack_id)
+        .bind(&sync.sync_type)
+        .bind(&sync.remote_url)
+        .bind(&sync.remote_branch)
+        .bind(&sync.auth_token)
+        .bind(&sync.last_commit)
+        .bind(&sync.last_synced_at)
+        .bind(&sync.status)
+        .execute(&self.pool)
+        .await
+        .context("Failed to upsert sync config")?;
+        Ok(())
+    }
+
+    pub async fn update_sync_status(&self, stack_id: &str, status: &str, last_commit: Option<&str>) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            "UPDATE stack_sync SET status=?, last_commit=COALESCE(?, last_commit), last_synced_at=? WHERE stack_id=?",
+        )
+        .bind(status)
+        .bind(last_commit)
+        .bind(&now)
+        .bind(stack_id)
+        .execute(&self.pool)
+        .await
+        .context("Failed to update sync status")?;
+        Ok(())
+    }
+
+    pub async fn list_sync_configs(&self) -> Result<Vec<StackSync>> {
+        let rows = sqlx::query_as::<_, StackSyncRow>(
+            "SELECT stack_id, sync_type, remote_url, remote_branch, auth_token, last_commit, last_synced_at, status \
+             FROM stack_sync ORDER BY stack_id",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to list sync configs")?;
+        Ok(rows.into_iter().map(StackSync::from).collect())
     }
 
     // ───── Dashboard ─────

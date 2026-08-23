@@ -43,6 +43,47 @@ impl From<StackRow> for Stack {
     }
 }
 
+// ───── Stack Sync ─────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StackSync {
+    pub stack_id: String,
+    pub sync_type: String,    // none | git_dir | git_remote
+    pub remote_url: Option<String>,
+    pub remote_branch: String,
+    pub auth_token: Option<String>, // stored encrypted (TODO)
+    pub last_commit: Option<String>,
+    pub last_synced_at: Option<String>,
+    pub status: String,       // idle | synced | pending | conflict
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct StackSyncRow {
+    pub stack_id: String,
+    pub sync_type: String,
+    pub remote_url: Option<String>,
+    pub remote_branch: String,
+    pub auth_token: Option<String>,
+    pub last_commit: Option<String>,
+    pub last_synced_at: Option<String>,
+    pub status: String,
+}
+
+impl From<StackSyncRow> for StackSync {
+    fn from(row: StackSyncRow) -> Self {
+        StackSync {
+            stack_id: row.stack_id,
+            sync_type: row.sync_type,
+            remote_url: row.remote_url,
+            remote_branch: row.remote_branch,
+            auth_token: row.auth_token,
+            last_commit: row.last_commit,
+            last_synced_at: row.last_synced_at,
+            status: row.status,
+        }
+    }
+}
+
 // ───── Dashboard status ─────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,4 +107,22 @@ pub struct UpdateStackRequest {
     pub name: Option<String>,
     pub description: Option<String>,
     pub compose: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SyncConfigRequest {
+    pub sync_type: Option<String>,
+    pub remote_url: Option<String>,
+    pub remote_branch: Option<String>,
+    pub auth_token: Option<String>,
+}
+
+// ───── Git diff output ─────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitDiff {
+    pub files_changed: Vec<String>,
+    pub additions: u64,
+    pub deletions: u64,
+    pub diff_text: String,
 }

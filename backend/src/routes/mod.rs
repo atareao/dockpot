@@ -8,6 +8,7 @@ use crate::auth::AppState;
 pub mod auth_routes;
 pub mod logs;
 pub mod stacks;
+pub mod sync;
 
 pub fn api_routes() -> Router<Arc<AppState>> {
     let public = Router::new()
@@ -33,7 +34,14 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         .route("/api/stacks/{id}/logs/ws", routing::get(logs::logs_ws_handler))
         .route("/api/status", routing::get(stacks::dashboard_status));
 
-    public.merge(protected)
+    let sync_routes = Router::new()
+        .route("/api/stacks/{id}/sync", routing::get(sync::get_config).put(sync::set_config))
+        .route("/api/stacks/{id}/sync/pull", routing::post(sync::pull))
+        .route("/api/stacks/{id}/sync/push", routing::post(sync::push))
+        .route("/api/stacks/{id}/sync/diff", routing::get(sync::diff))
+        .route("/api/stacks/{id}/sync/status", routing::get(sync::status));
+
+    public.merge(protected).merge(sync_routes)
 }
 
 pub async fn health() -> axum::Json<serde_json::Value> {
