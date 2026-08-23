@@ -7,9 +7,11 @@ import {
 import {
   ArrowLeftOutlined, PlayCircleOutlined, StopOutlined, ReloadOutlined,
   CloudUploadOutlined, CheckCircleOutlined, CloseCircleOutlined,
+  DownloadOutlined, CodeOutlined, ConsoleOutlined,
 } from '@ant-design/icons';
 import { api, Stack } from '../api/http';
 import { YamlEditor } from '../components/YamlEditor';
+import { Terminal } from '../components/Terminal';
 
 const { Title, Text } = Typography;
 const { Content, Header } = Layout;
@@ -22,6 +24,7 @@ export function StackDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deploying, setDeploying] = useState(false);
+  const [pulling, setPulling] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [yamlValid, setYamlValid] = useState(true);
   const [yamlErrors, setYamlErrors] = useState<string[]>([]);
@@ -113,6 +116,19 @@ export function StackDetail() {
     });
   };
 
+  const handlePull = async () => {
+    if (!id) return;
+    try {
+      setPulling(true);
+      await api.pullStack(id);
+      message.success('📥 Images updated');
+    } catch (e: any) {
+      message.error('Pull failed: ' + e.message);
+    } finally {
+      setPulling(false);
+    }
+  };
+
   const handleValidateSyntax = async () => {
     try {
       const result = await api.validateCompose(compose);
@@ -172,6 +188,13 @@ export function StackDetail() {
           loading={deploying}
         >
           Deploy
+        </Button>
+        <Button
+          icon={<DownloadOutlined />}
+          onClick={handlePull}
+          loading={pulling}
+        >
+          Update Images
         </Button>
       </Header>
       <Content style={{ padding: 24 }}>
@@ -272,6 +295,10 @@ export function StackDetail() {
               {compose}
             </pre>
           )}
+        </Card>
+
+        <Card title="📋 Live Logs" style={{ marginTop: 16 }}>
+          <Terminal stackId={stack.id} stackName={stack.name} height={350} />
         </Card>
       </Content>
     </Layout>

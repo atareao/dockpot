@@ -6,6 +6,7 @@ use axum::Router;
 use crate::auth::AppState;
 
 pub mod auth_routes;
+pub mod logs;
 pub mod stacks;
 
 pub fn api_routes() -> Router<Arc<AppState>> {
@@ -29,6 +30,7 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         .route("/api/stacks/{id}/compose", routing::get(stacks::get_compose).put(stacks::update_compose))
         .route("/api/stacks/validate", routing::post(stacks::validate_compose))
         .route("/api/stacks/{id}/pull", routing::post(stacks::pull))
+        .route("/api/stacks/{id}/logs/ws", routing::get(logs::logs_ws_handler))
         .route("/api/status", routing::get(stacks::dashboard_status));
 
     public.merge(protected)
