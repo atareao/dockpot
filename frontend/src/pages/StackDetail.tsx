@@ -27,6 +27,13 @@ export function StackDetail() {
   const [pulling, setPulling] = useState(false);
   const [syncConfig, setSyncConfig] = useState<StackSync | null>(null);
   const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [envFiles, setEnvFiles] = useState<any[]>([]);
+  const [notifiers, setNotifiers] = useState<any[]>([]);
+  const [stackNotifiers, setStackNotifiers] = useState<string[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [notifierModalOpen, setNotifierModalOpen] = useState(false);
+  const [envContent, setEnvContent] = useState('');
+  const [envFilename, setEnvFilename] = useState('.env');
   const [editMode, setEditMode] = useState(false);
   const [yamlValid, setYamlValid] = useState(true);
   const [yamlErrors, setYamlErrors] = useState<string[]>([]);
@@ -50,6 +57,26 @@ export function StackDetail() {
   }, [id]);
 
   useEffect(() => { loadStack(); }, [loadStack]);
+
+  const loadEnvFiles = async () => {
+    if (!id) return;
+    try { setEnvFiles(await api.listEnvFiles(id)); } catch {}
+  };
+
+  const loadNotifiers = async () => {
+    if (!id) return;
+    try {
+      setNotifiers(await api.listNotifiers());
+      setStackNotifiers(await api.getStackNotifiers(id));
+    } catch {}
+  };
+
+  const loadStats = async () => {
+    if (!id) return;
+    try { setStats(await api.getStackStats(id)); } catch {}
+  };
+
+  useEffect(() => { if (id) { loadEnvFiles(); loadNotifiers(); loadStats(); } }, [id]);
 
   const handleAction = async (action: 'start' | 'stop' | 'restart') => {
     if (!id) return;
@@ -212,6 +239,9 @@ export function StackDetail() {
             {syncConfig.status}
           </Tag>
         )}
+        <Button icon={<DownloadOutlined />} onClick={() => api.exportStack(stack.id)}>
+          Export
+        </Button>
       </Header>
       <Content style={{ padding: 24 }}>
         <Card size="small" style={{ marginBottom: 16 }}>
@@ -317,6 +347,68 @@ export function StackDetail() {
           <Terminal stackId={stack.id} stackName={stack.name} height={350} />
         </Card>
 
+        <Card title="📊 Stats" size="small" style={{ marginTop: 16 }}>
+          {stats ? (
+            <Descriptions column={2} size="small">
+              <Descriptions.Item label="Last Started">
+                {stats.last_started_at ? new Date(stats.last_started_at).toLocaleString() : 'Never'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Total Running">
+                {stats.total_running_seconds > 0
+                  ? `${Math.floor(stats.total_running_seconds / 3600)}h ${Math.floor((stats.total_running_seconds % 3600) / 60)}m`
+                  : '0m'}
+              </Descriptions.Item>
+            </Descriptions>
+          ) : <Text type="secondary">No stats available</Text>}
+        </Card>
+
+        <Card title="🔤 Environment Files" size="small" style={{ marginTop: 16 }}
+          extra={<Button size="small" type="primary" onClick={() => {
+            setEnvFilename('.env'); setEnvContent(''); setNotifierModalOpen(true);
+          }}>Add .env</Button>}
+        >
+          {envFiles.length === 0 ? <Text type="secondary">No env files</Text> : (
+            <Space wrap>
+              {envFiles.map((env) => (
+                <Tag key={env.id} closable onClose={async () => {
+                  await api.deleteEnvFile(stack.id, env.filename);
+                  loadEnvFiles();
+                }} style={{ cursor: 'pointer' }} onClick={() => {
+                  setEnvFilename(env.filename);
+                  setEnvContent(env.content);
+                  setNotifierModalOpen(true);
+                }}>
+                  {env.filename}
+                </Tag>
+              ))}
+            </Space>
+          )}
+        </Card>
+
+        <Card title="📢 Notifiers" size="small" style={{ marginTop: 16 }}>
+          {notifiers.length === 0 ? <Text type="secondary">No notifiers configured</Text> : (
+            <Space wrap>
+              {notifiers.map((n) => (
+                <Tag
+                  key={n.id}
+                  color={stackNotifiers.includes(n.id) ? 'blue' : 'default'}
+                  style={{ cursor: 'pointer' }}
+                  onClick={async () => {
+                    const current = await api.getStackNotifiers(stack.id);
+                    const updated = current.includes(n.id)
+                      ? current.filter((x: string) => x !== n.id)
+                      : [...current, n.id];
+                    await api.setStackNotifiers(stack.id, updated);
+                    setStackNotifiers(updated);
+                  }}
+                >
+                  {n.name} ({n.notifier_type})
+                </Tag>
+              ))}
+            </Space>
+          )}
+        </Card>
+
         <Modal
           title="⚙️ Git Sync Configuration"
           open={syncModalOpen}
@@ -332,6 +424,31 @@ export function StackDetail() {
               setSyncModalOpen(false);
               id && api.getSyncConfig(id).then(setSyncConfig).catch(() => {});
             }}
+          />
+        </Modal>
+
+        <Modal
+          title={`🔤 Edit ${envFilename}`}
+          open={notifierModalOpen}
+          onCancel={() => setNotifierModalOpen(false)}
+          onOk={async () => {
+            if (!id) return;
+            await api.upsertEnvFile(id, envFilename, envContent);
+            setNotifierModalOpen(false);
+            loadEnvFiles();
+          }}
+          width={600}
+        >
+          <div style={{ marginBottom: 8 }}>
+            <label>Filename:</label>
+            <input value={envFilename} onChange={(e) => setEnvFilename(e.target.value)}
+              style={{ width: '100%', padding: '4px 8px', borderRadius: 4, border: '1px solid #d9d9d9', fontSize: 14 }}
+            />
+          </div>
+          <textarea value={envContent} onChange={(e) => setEnvContent(e.target.value)}
+            rows={10}
+            style={{ width: '100%', fontFamily: 'monospace', fontSize: 13, padding: 8, borderRadius: 4, border: '1px solid #d9d9d9' }}
+            placeholder="DB_HOST=localhost&#10;DB_PORT=5432"
           />
         </Modal>
       </Content>

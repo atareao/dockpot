@@ -183,6 +183,25 @@ pub async fn start(
     }
 
     state.db.update_status(&id, "running").await.ok();
+    state.db.record_start(&id).await.ok();
+    state.db.append_logs(&id, &format!("✅ Stack '{}' started\n", stack.name), "info").await.ok();
+
+    // Send notification
+    if let Ok(notifier_ids) = state.db.get_stack_notifier_ids(&id).await {
+        for nid in &notifier_ids {
+            if let Ok(Some(notifier)) = state.db.get_notifier(nid).await {
+                if notifier.enabled {
+                    let _ = crate::notifier::send_notification(
+                        &notifier.notifier_type,
+                        &notifier.config_json,
+                        &format!("✅ {} started", stack.name),
+                        &format!("Stack '{}' has been deployed successfully.", stack.name),
+                    ).await;
+                }
+            }
+        }
+    }
+
     tracing::info!("✅ Stack '{}' started", stack.name);
 
     let stack = state.db.get_stack(&id).await.unwrap().unwrap();
@@ -221,6 +240,25 @@ pub async fn stop(
     }
 
     state.db.update_status(&id, "stopped").await.ok();
+    state.db.record_stop(&id).await.ok();
+    state.db.append_logs(&id, &format!("⏹️  Stack '{}' stopped\n", stack.name), "info").await.ok();
+
+    // Send notification
+    if let Ok(notifier_ids) = state.db.get_stack_notifier_ids(&id).await {
+        for nid in &notifier_ids {
+            if let Ok(Some(notifier)) = state.db.get_notifier(nid).await {
+                if notifier.enabled {
+                    let _ = crate::notifier::send_notification(
+                        &notifier.notifier_type,
+                        &notifier.config_json,
+                        &format!("⏹️ {} stopped", stack.name),
+                        &format!("Stack '{}' has been stopped.", stack.name),
+                    ).await;
+                }
+            }
+        }
+    }
+
     tracing::info!("⏹️  Stack '{}' stopped", stack.name);
 
     let stack = state.db.get_stack(&id).await.unwrap().unwrap();

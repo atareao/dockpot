@@ -118,14 +118,12 @@ dockpot/
 | **Total** | | **~2h 45min** |
 
 ### Fase 5— Convertir docker run a compose yagentes (1 sesión)
-
-| Tarea | Archios | Estimación |
-|-------|---------|:----------:|
-| 5.1 Parse `docker ru` args a compose.yaml | `ocker/mod.s` | 30in |
-| 5.2 UI: input de "docker run ..." → vista previa → guardar | `StackDetail.tsx` | 30min |
-| 5.3 Soporte de agentes remotos (múltiples Docker hosts) | `config.rs`, `docker/agent.rs` | 40min |
-| 5.4 Gestión de agentes en UI | `pages/Agents.tsx` | 20min |
-| **Total** | | **~2h** |
+|### Fase 5 — Convertir docker run a compose (1 sesión)
+|\n|| Tarea | Archivos | Estimación |
+||-------|---------|:----------:|
+|| 5.1 Parse `docker run` args a compose.yaml | `convert.rs` | 30min |
+|| 5.2 UI: input de `docker run ...` → vista previa → guardar | `Stacks.tsx` | 30min |
+|| **Total** | | **~1h** |
 
 ## Tablas SQLite
 
@@ -228,11 +226,31 @@ CREATE TABLE settings (
 - Tests para cada endpoint nuevo
 - Frontend build antes de cada commit de backend
 
-## Post-MVP (futuro)
+## Post-MVP (futuro / descartado / pendiente)
 
-- [` ] Agentes remotos (gestión multi-host)
-- [ ] Template library (inyectar variables de entrono)
-- [ ] Dif irección vs remoto en UI con sintaxis coloreada
-- [ ] Notificacones vía los 8 notificadores de vigilatrs
-- [ ] Backup automático de stacks (zip + fecha)
-- [ ] Stas Página pública para stacks
+### Descartado
+- [-] Agentes remotos (gestión multi-host)
+- [-] Status pages públicas
+
+### Pendiente (implementado)
+
+### Calidad de vida ✅
+- ✅ Dashboard con cards de resumen (stacks up/down, última actividad, Docker info)
+- ✅ Logs con coloreado por severidad (ERROR rojo, WARN amarillo)
+- ✅ Logs históricos (persistencia en BD + endpoint GET)
+- ✅ Exportar stack completo (zip con compose.yaml + .env + git)
+- ✅ Modo oscuro (toggle sun/moon en UI, persistencia localStorage)
+
+### Funcionalidad extra ✅
+- ✅ Gestor de .env por stack (CRUD, persistencia en BD + disco)
+- ✅ Docker info (versión engine, contenedores, imágenes, disco)
+- ✅ Múltiples compose: soporte compose.yaml estándar
+- ✅ Estadísticas de stack (último inicio, tiempo total running)
+
+### Notificaciones ✅
+- ✅ Tabla notifiers en SQLite
+- ✅ Endpoints CRUD + test
+- ✅ Telegram (vía API Bot)
+- ✅ ntfy (vía HTTP con autenticación opcional)
+- ✅ Asignación notifier → stack (N:M)
+- ✅ Notificaciones automáticas al start/stop

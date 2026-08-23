@@ -2,10 +2,14 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Button, Space, Tag } from 'antd';
 import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
 
-interface TerminalProps {
-  stackId: string;
-  stackName: string;
-  height?: string | number;
+interface TerminalProps { stackId: string; stackName: string; height?: string | number; }
+
+function colorizeLine(line: string): React.ReactNode {
+  const lower = line.toUpperCase();
+  let color = '#c9d1d9';
+  if (lower.includes('ERROR') || lower.includes('FATAL') || line.includes('] ERROR')) color = '#ff6b6b';
+  else if (lower.includes('WARN') || lower.includes('WARNING')) color = '#ffd93d';
+  return <div style={{ color, fontFamily: "'Cascadia Code', 'Fira Code', monospace", fontSize: 12, lineHeight: 1.5 }}>{line}</div>;
 }
 
 export function Terminal({ stackId, stackName, height = 400 }: TerminalProps) {
@@ -13,120 +17,40 @@ export function Terminal({ stackId, stackName, height = 400 }: TerminalProps) {
   const [lines, setLines] = useState<string[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const maxLines = 1000;
 
   const connect = useCallback(() => {
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-
-    // Determine WS protocol
+    wsRef.current?.close();
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const url = `${protocol}//${host}/api/stacks/${stackId}/logs/ws`;
-
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(`${protocol}//${window.location.host}/api/stacks/${stackId}/logs/ws`);
     wsRef.current = ws;
-
-    ws.onopen = () => {
-      setConnected(true);
-      setLines([]);
-    };
-
-    ws.onmessage = (event) => {
-      setLines((prev) => {
-        const next = [...prev, event.data];
-        return next.length > maxLines ? next.slice(-maxLines) : next;
-      });
-    };
-
-    ws.onclose = () => {
-      setConnected(false);
-    };
-
-    ws.onerror = () => {
-      setConnected(false);
-    };
+    ws.onopen = () => { setConnected(true); setLines([]); };
+    ws.onmessage = (e) => setLines((prev) => [...prev.slice(-999), e.data]);
+    ws.onclose = () => setConnected(false);
+    ws.onerror = () => setConnected(false);
   }, [stackId]);
 
-  useEffect(() => {
-    connect();
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, [connect]);
-
-  // Auto-scroll to bottom
-  useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  }, [lines]);
-
-  const handleClear = () => {
-    setLines([]);
-  };
-
-  const handleReconnect = () => {
-    connect();
-  };
-
-  const handleDownload = () => {
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${stackName}-logs.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  useEffect(() => { connect(); return () => wsRef.current?.close(); }, [connect]);
+  useEffect(() => { if (containerRef.current) containerRef.current.scrollTop = containerRef.current.scrollHeight; }, [lines]);
 
   return (
     <div>
       <Space style={{ marginBottom: 8 }}>
-        <Tag color={connected ? 'green' : 'red'}>
-          {connected ? '🟢 Connected' : '🔴 Disconnected'}
-        </Tag>
-        <Button size="small" icon={<ReloadOutlined />} onClick={handleReconnect}>
-          Reconnect
-        </Button>
-        <Button size="small" icon={<DownloadOutlined />} onClick={handleDownload}>
-          Download
-        </Button>
-        <Button size="small" onClick={handleClear}>
-          Clear
-        </Button>
-        {lines.length > 0 && (
-          <Tag color="default">{lines.length} lines</Tag>
-        )}
+        <Tag color={connected ? 'green' : 'red'}>{connected ? '🟢 Connected' : '🔴 Disconnected'}</Tag>
+        <Button size="small" icon={<ReloadOutlined />} onClick={connect}>Reconnect</Button>
+        <Button size="small" icon={<DownloadOutlined />} onClick={() => {
+          const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/plain' }));
+          a.download = `${stackName}-logs.txt`; a.click();
+        }}>Download</Button>
+        <Button size="small" onClick={() => setLines([])}>Clear</Button>
+        <Tag>{lines.length} lines</Tag>
       </Space>
-      <div
-        ref={containerRef}
-        style={{
-          background: '#0d1117',
-          color: '#c9d1d9',
-          fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace",
-          fontSize: 12,
-          lineHeight: 1.5,
-          padding: 12,
-          borderRadius: 6,
-          overflow: 'auto',
-          height,
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-all',
-        }}
-      >
-        {lines.length === 0 ? (
-          <span style={{ color: '#8b949e', fontStyle: 'italic' }}>
-            {connected ? 'Waiting for logs...' : 'Not connected. Click Reconnect.'}
-          </span>
-        ) : (
-          lines.map((line, i) => (
-            <div key={i}>{line}</div>
-          ))
-        )}
+      <div ref={containerRef} style={{
+        background: '#0d1117', padding: 12, borderRadius: 6, overflow: 'auto', height,
+        whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+      }}>
+        {lines.length === 0
+          ? <span style={{ color: '#8b949e', fontStyle: 'italic' }}>{connected ? 'Waiting for logs...' : 'Not connected. Click Reconnect.'}</span>
+          : lines.map((line, i) => <div key={i}>{colorizeLine(line)}</div>)}
       </div>
     </div>
   );

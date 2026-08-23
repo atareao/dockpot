@@ -8,13 +8,11 @@ pub struct Stack {
     pub name: String,
     pub description: Option<String>,
     pub compose: String,
-    pub status: String, // stopped | running | error
+    pub status: String,
     pub path: String,
     pub created_at: String,
     pub updated_at: String,
 }
-
-// ───── DB row type ─────
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct StackRow {
@@ -48,13 +46,13 @@ impl From<StackRow> for Stack {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StackSync {
     pub stack_id: String,
-    pub sync_type: String,    // none | git_dir | git_remote
+    pub sync_type: String,
     pub remote_url: Option<String>,
     pub remote_branch: String,
-    pub auth_token: Option<String>, // stored encrypted (TODO)
+    pub auth_token: Option<String>,
     pub last_commit: Option<String>,
     pub last_synced_at: Option<String>,
-    pub status: String,       // idle | synced | pending | conflict
+    pub status: String,
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -84,13 +82,107 @@ impl From<StackSyncRow> for StackSync {
     }
 }
 
-// ───── Dashboard status ─────
+// ───── Dashboard / Docker Info ─────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DashboardStatus {
     pub total_stacks: u64,
     pub running_stacks: u64,
     pub stopped_stacks: u64,
+    pub error_stacks: u64,
+    pub docker_version: Option<String>,
+    pub docker_containers: u64,
+    pub docker_images: u64,
+    pub recent_activity: Vec<RecentActivity>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecentActivity {
+    pub stack_name: String,
+    pub action: String,
+    pub timestamp: String,
+}
+
+// ───── Env File ─────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnvFile {
+    pub id: String,
+    pub stack_id: String,
+    pub filename: String,
+    pub content: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct EnvFileRow {
+    pub id: String,
+    pub stack_id: String,
+    pub filename: String,
+    pub content: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<EnvFileRow> for EnvFile {
+    fn from(row: EnvFileRow) -> Self {
+        EnvFile {
+            id: row.id,
+            stack_id: row.stack_id,
+            filename: row.filename,
+            content: row.content,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+// ───── Notifier ─────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Notifier {
+    pub id: String,
+    pub name: String,
+    pub notifier_type: String,
+    pub config_json: serde_json::Value,
+    pub enabled: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct NotifierRow {
+    pub id: String,
+    pub name: String,
+    pub notifier_type: String,
+    pub config_json: String,
+    pub enabled: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<NotifierRow> for Notifier {
+    fn from(row: NotifierRow) -> Self {
+        Notifier {
+            id: row.id,
+            name: row.name,
+            notifier_type: row.notifier_type,
+            config_json: serde_json::from_str(&row.config_json).unwrap_or_default(),
+            enabled: row.enabled != 0,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+// ───── Stack Stats ─────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StackStats {
+    pub stack_id: String,
+    pub last_started_at: Option<String>,
+    pub total_running_seconds: i64,
 }
 
 // ───── Create / Update requests ─────
@@ -115,6 +207,19 @@ pub struct SyncConfigRequest {
     pub remote_url: Option<String>,
     pub remote_branch: Option<String>,
     pub auth_token: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateNotifierRequest {
+    pub name: String,
+    pub notifier_type: String,
+    pub config_json: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DockerRunRequest {
+    pub command: String,
+    pub service_name: Option<String>,
 }
 
 // ───── Git diff output ─────
@@ -193,10 +298,4 @@ pub struct CreateAgentRequest {
     pub client_cert: Option<String>,
     pub client_key: Option<String>,
     pub description: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct DockerRunRequest {
-    pub command: String,
-    pub service_name: Option<String>,
 }

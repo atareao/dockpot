@@ -40,6 +40,46 @@ export interface DashboardStatus {
   stopped_stacks: number;
 }
 
+export interface DockerInfo {
+  version: string;
+  engine: string;
+  containers_total: number;
+  containers_running: number;
+  images: number;
+  disk_usage: number;
+}
+
+export interface LogEntry {
+  content: string;
+  level: string;
+  created_at: string;
+}
+
+export interface EnvFile {
+  id: string;
+  stack_id: string;
+  filename: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Notifier {
+  id: string;
+  name: string;
+  notifier_type: string;
+  config_json: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StackStats {
+  stack_id: string;
+  last_started_at: string | null;
+  total_running_seconds: number;
+}
+
 export interface StackSync {
   stack_id: string;
   sync_type: string;
@@ -144,4 +184,45 @@ export const api = {
   updateAgent: (id: string, data: { name: string; host: string; port?: number; description?: string }) =>
     request<Agent>(`/api/agents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteAgent: (id: string) => request<void>(`/api/agents/${id}`, { method: 'DELETE' }),
+
+  // Docker Info
+  getDockerInfo: () => request<DockerInfo>('/api/docker/info'),
+
+  // Stack Logs
+  getStackLogs: (id: string, limit?: number, offset?: number) => {
+    const params = new URLSearchParams();
+    if (limit !== undefined) params.set('limit', String(limit));
+    if (offset !== undefined) params.set('offset', String(offset));
+    const qs = params.toString();
+    return request<LogEntry[]>(`/api/stacks/${id}/logs${qs ? '?' + qs : ''}`);
+  },
+
+  // Env Files
+  listEnvFiles: (id: string) => request<EnvFile[]>(`/api/stacks/${id}/env`),
+  upsertEnvFile: (id: string, filename: string, content: string) =>
+    request<EnvFile>(`/api/stacks/${id}/env`, { method: 'PUT', body: JSON.stringify({ filename, content }) }),
+  deleteEnvFile: (id: string, filename: string) =>
+    request<void>(`/api/stacks/${id}/env/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
+
+  // Notifiers
+  listNotifiers: () => request<Notifier[]>('/api/notifiers'),
+  createNotifier: (data: { name: string; notifier_type: string; config_json: string; enabled?: boolean }) =>
+    request<Notifier>('/api/notifiers', { method: 'POST', body: JSON.stringify(data) }),
+  updateNotifier: (id: string, data: { name?: string; notifier_type?: string; config_json?: string; enabled?: boolean }) =>
+    request<Notifier>(`/api/notifiers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteNotifier: (id: string) => request<void>(`/api/notifiers/${id}`, { method: 'DELETE' }),
+  testNotifier: (id: string) => request<{ status: string; message?: string }>(`/api/notifiers/${id}/test`, { method: 'POST' }),
+
+  // Stack Notifier Assignments
+  getStackNotifiers: (id: string) => request<string[]>(`/api/stacks/${id}/notifiers`),
+  setStackNotifiers: (id: string, notifierIds: string[]) =>
+    request<void>(`/api/stacks/${id}/notifiers`, { method: 'PUT', body: JSON.stringify({ notifier_ids: notifierIds }) }),
+
+  // Export
+  exportStack: (id: string) => {
+    window.open(`/api/stacks/${id}/export`, '_blank');
+  },
+
+  // Stats
+  getStackStats: (id: string) => request<StackStats>(`/api/stacks/${id}/stats`),
 };
