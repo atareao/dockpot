@@ -16,3 +16,6 @@ data/
 .DS_Store
 *.swp
 *.swo
+
+# TypeScript build info
+*.tsbuildinfo
