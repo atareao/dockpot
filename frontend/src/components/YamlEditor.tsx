@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import Editor, { OnMount, OnChange } from '@monaco-editor/react';
 import { Spin } from 'antd';
+import type { editor } from 'monaco-editor';
 
 interface YamlEditorProps {
   value: string;
@@ -24,7 +25,7 @@ export function YamlEditor({
 
     // Register YAML language markers
     monaco.languages.registerDocumentFormattingEditProvider('yaml', {
-      provideDocumentFormattingEdits(model) {
+      provideDocumentFormattingEdits(model: editor.ITextModel) {
         return [
           {
             text: model.getValue(),
@@ -35,12 +36,12 @@ export function YamlEditor({
     });
 
     // Track diagnostics (syntax errors)
-    monaco.editor.onDidCreateModel((model) => {
+    monaco.editor.onDidCreateModel((model: editor.ITextModel) => {
       model.onDidChangeContent(() => {
         const markers = monaco.editor.getModelMarkers({ owner: model.getLanguageId() });
         const errors = markers
-          .filter((m) => m.severity === monaco.MarkerSeverity.Error)
-          .map((m) => `Line ${m.startLineNumber}: ${m.message}`);
+          .filter((m: editor.IMarker) => m.severity === monaco.MarkerSeverity.Error)
+          .map((m: editor.IMarker) => `Line ${m.startLineNumber}: ${m.message}`);
         onValidate?.(errors.length === 0, errors);
       });
     });
