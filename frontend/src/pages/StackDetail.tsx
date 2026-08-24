@@ -4,10 +4,9 @@ import {
   Typography, Spin, Button, Space, Tag, Card, Descriptions, App as AntApp, Layout,
   Alert, Switch, Modal,
 } from 'antd';
-import {
-  ArrowLeftOutlined, PlayCircleOutlined, StopOutlined, ReloadOutlined,
+import { ArrowLeftOutlined, PlayCircleOutlined, StopOutlined, ReloadOutlined,
   CloudUploadOutlined, CheckCircleOutlined, CloseCircleOutlined,
-  DownloadOutlined, GithubOutlined,
+  DownloadOutlined, GithubOutlined, CodeOutlined,
 } from '@ant-design/icons';
 import { api, Stack, StackSync } from '../api/http';
 import { YamlEditor } from '../components/YamlEditor';

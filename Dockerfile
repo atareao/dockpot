@@ -1,48 +1,73 @@
-# ───── Build stage ─────
-FROM rust:1.84-slim-bookworm AS builder
+# ═══════════════════════════════════════════════════════════════
+# Stage 1: Frontend (npm)
+# ═══════════════════════════════════════════════════════════════
+# MUST be first — backend embeds the dist at compile time via include_dir!
+FROM docker.io/library/node:23-alpine AS frontend-builder
 
-RUN apt-get update && apt-get install -y \
-    pkg-config libssl-dev libsqlite3-dev libgit2-dev zlib1g-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-COPY backend/ .
-
-RUN cargo build --release && \
-    cp target/release/dockpot /dockpot
-
-# ───── Frontend build stage ─────
-FROM node:22-alpine AS frontend-builder
-
-WORKDIR /app
+WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
-COPY frontend/ .
+
+COPY frontend/ ./
 RUN npm run build
 
-# ───── Runtime stage ─────
-FROM debian:bookworm-slim
+# ═══════════════════════════════════════════════════════════════
+# Stage 2: Backend (Rust)
+# ═══════════════════════════════════════════════════════════════
+FROM docker.io/library/rust:alpine3.23 AS backend-builder
 
-RUN apt-get update && apt-get install -y \
-    ca-certificates docker-compose-plugin curl zip \
-    libsqlite3-0 libgit2-1.7 \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache --update \
+    build-base \
+    musl-dev \
+    pkgconfig \
+    openssl-dev \
+    openssl-libs-static
 
-RUN addgroup --system dockpot && adduser --system --ingroup dockpot dockpot
+WORKDIR /build
+
+# Cache dependencies (avoid recompiling every time)
+RUN cargo init --bin --name dockpot . && \
+    mkdir -p src && \
+    echo '// dummy' > src/lib.rs
+
+COPY backend/Cargo.toml backend/Cargo.lock ./
+
+# Frontend dist MUST be present before building deps — include_dir! embeds it at compile time
+# Path resolves as $CARGO_MANIFEST_DIR/../frontend/dist = /build/../frontend/dist = /frontend/dist
+COPY --from=frontend-builder /build/dist /frontend/dist
+
+RUN cargo build --release && \
+    rm -rf src
+
+COPY backend/src ./src
+COPY backend/migrations ./migrations
+RUN touch src/main.rs src/lib.rs && \
+    cargo build --release && \
+    strip target/release/dockpot
+
+# ═══════════════════════════════════════════════════════════════
+# Stage 3: Runtime
+# ═══════════════════════════════════════════════════════════════
+FROM alpine:3.23
+
+RUN apk add --no-cache \
+    ca-certificates \
+    curl \
+    zip \
+    docker-cli \
+    docker-compose \
+    && adduser -D -h /app -u 1000 app
 
 WORKDIR /app
-RUN mkdir -p data stacks && chown -R dockpot:dockpot /app
+COPY --from=backend-builder /build/target/release/dockpot /usr/local/bin/dockpot
+COPY --from=frontend-builder /build/dist ./dist
 
-COPY --from=builder /dockpot /usr/local/bin/dockpot
-COPY --from=frontend-builder /app/dist /app/frontend/dist
-COPY backend/.env.example /app/.env.example
+RUN mkdir -p /app/data /app/stacks && chown -R app:app /app
 
-USER dockpot
-
+USER app
 EXPOSE 3056
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -sf http://localhost:3056/health || exit 1
 
-ENTRYPOINT ["dockpot"]
-CMD []
+CMD ["dockpot"]

@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use axum::extract::{Path, Query};
 use axum::extract::State;
-use axum::Json;
+use axum::extract::{Path, Query};
 use axum::http::StatusCode;
+use axum::Json;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -23,7 +23,10 @@ pub async fn get_logs(
     let limit = query.limit.unwrap_or(100).min(1000);
     let offset = query.offset.unwrap_or(0);
 
-    let logs = state.db.get_logs(&stack_id, limit, offset).await
+    let logs = state
+        .db
+        .get_logs(&stack_id, limit, offset)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let result: Vec<serde_json::Value> = logs.into_iter().map(|(content, level, ts)| {
