@@ -14,7 +14,10 @@ pub async fn send(
 
     let url = format!("{}/{}", server_url.trim_end_matches('/'), topic);
 
-    let mut req = client.post(&url).header("Title", title).body(message.to_string());
+    let mut req = client
+        .post(&url)
+        .header("Title", title)
+        .body(message.to_string());
 
     if let Some(t) = token {
         req = req.header("Authorization", format!("Bearer {}", t));

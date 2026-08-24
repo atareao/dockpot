@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Typography, Spin, Button, Space, Tag, Card, Modal, Form, Input, App as AntApp, Layout, Table,
 } from 'antd';

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use axum::extract::State;
-use axum::Json;
 use axum::http::StatusCode;
+use axum::Json;
 use serde_json::Value;
 
 use crate::auth::AppState;
@@ -12,44 +12,86 @@ pub async fn docker_info(
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let version = tokio::process::Command::new("docker")
         .args(["version", "--format", "{{.Server.Version}}"])
-        .output().await.ok()
+        .output()
+        .await
+        .ok()
         .and_then(|o| {
             let v = String::from_utf8_lossy(&o.stdout).trim().to_string();
-            if v.is_empty() { None } else { Some(v) }
+            if v.is_empty() {
+                None
+            } else {
+                Some(v)
+            }
         });
 
     let engine = tokio::process::Command::new("docker")
         .args(["info", "--format", "{{.ServerVersion}}"])
-        .output().await.ok()
+        .output()
+        .await
+        .ok()
         .and_then(|o| {
             let v = String::from_utf8_lossy(&o.stdout).trim().to_string();
-            if v.is_empty() { None } else { Some(v) }
+            if v.is_empty() {
+                None
+            } else {
+                Some(v)
+            }
         });
 
     let containers_total = tokio::process::Command::new("docker")
         .args(["ps", "-aq"])
-        .output().await.ok()
-        .map(|o| String::from_utf8_lossy(&o.stdout).lines().filter(|l| !l.is_empty()).count() as u64)
+        .output()
+        .await
+        .ok()
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter(|l| !l.is_empty())
+                .count() as u64
+        })
         .unwrap_or(0);
 
     let containers_running = tokio::process::Command::new("docker")
         .args(["ps", "-q"])
-        .output().await.ok()
-        .map(|o| String::from_utf8_lossy(&o.stdout).lines().filter(|l| !l.is_empty()).count() as u64)
+        .output()
+        .await
+        .ok()
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter(|l| !l.is_empty())
+                .count() as u64
+        })
         .unwrap_or(0);
 
     let images = tokio::process::Command::new("docker")
         .args(["images", "-q"])
-        .output().await.ok()
-        .map(|o| String::from_utf8_lossy(&o.stdout).lines().filter(|l| !l.is_empty()).count() as u64)
+        .output()
+        .await
+        .ok()
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter(|l| !l.is_empty())
+                .count() as u64
+        })
         .unwrap_or(0);
 
     let disk_usage = tokio::process::Command::new("docker")
         .args(["system", "df", "--format", "{{.Size}}"])
-        .output().await.ok()
+        .output()
+        .await
+        .ok()
         .and_then(|o| {
-            let v = String::from_utf8_lossy(&o.stdout).lines().next()?.to_string();
-            if v.is_empty() { None } else { Some(v) }
+            let v = String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .next()?
+                .to_string();
+            if v.is_empty() {
+                None
+            } else {
+                Some(v)
+            }
         });
 
     Ok(Json(serde_json::json!({

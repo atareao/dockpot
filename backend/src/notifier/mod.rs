@@ -1,7 +1,7 @@
 use serde_json::Value;
 
-pub mod telegram;
 pub mod ntfy;
+pub mod telegram;
 pub mod webhook;
 
 /// Send a notification through the appropriate channel

@@ -1,0 +1,38 @@
+# Git
+.git/
+.gitignore
+
+# Rust build artifacts
+backend/target/
+
+# Frontend build artifacts (local)
+frontend/dist/
+frontend/node_modules/
+
+# npm lock (proyecto usa npm — se excluye para evitar contexto innecesario)
+#frontend/package-lock.json
+
+# Persistence files (generated at runtime)
+*.json
+*.log
+
+# Runtime data (created at startup)
+data/
+stacks/
+
+# Local config with secrets
+backend/.env
+
+# Docs / config examples
+AGENTS.md
+README.md
+PLAN.md
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

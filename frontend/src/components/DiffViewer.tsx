@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface DiffViewerProps {
   diffText: string;
   height?: string | number;

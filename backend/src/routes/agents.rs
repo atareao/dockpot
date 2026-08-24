@@ -1,25 +1,19 @@
 use std::sync::Arc;
 
 use axum::extract::{Path, State};
-use axum::Json;
 use axum::http::StatusCode;
+use axum::Json;
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::auth::AppState;
 use crate::models::{Agent, CreateAgentRequest};
 
-pub async fn list(
-    State(state): State<Arc<AppState>>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    let agents = state
-        .db
-        .list_agents()
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to list agents: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-        })?;
+pub async fn list(State(state): State<Arc<AppState>>) -> Result<Json<Value>, (StatusCode, String)> {
+    let agents = state.db.list_agents().await.map_err(|e| {
+        tracing::error!("Failed to list agents: {}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
 
     Ok(Json(serde_json::json!(agents)))
 }
@@ -69,14 +63,10 @@ pub async fn create(
         updated_at: now,
     };
 
-    state
-        .db
-        .create_agent(&agent)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to create agent: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-        })?;
+    state.db.create_agent(&agent).await.map_err(|e| {
+        tracing::error!("Failed to create agent: {}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
 
     tracing::info!("✅ Agent '{}' created", agent.name);
     Ok(Json(serde_json::json!(agent)))
@@ -113,14 +103,10 @@ pub async fn update(
         updated_at: chrono::Utc::now().to_rfc3339(),
     };
 
-    state
-        .db
-        .update_agent(&id, &agent)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to update agent: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-        })?;
+    state.db.update_agent(&id, &agent).await.map_err(|e| {
+        tracing::error!("Failed to update agent: {}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
 
     tracing::info!("📝 Agent '{}' updated", agent.name);
     Ok(Json(serde_json::json!(agent)))
@@ -130,14 +116,10 @@ pub async fn delete(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let deleted = state
-        .db
-        .delete_agent(&id)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to delete agent: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-        })?;
+    let deleted = state.db.delete_agent(&id).await.map_err(|e| {
+        tracing::error!("Failed to delete agent: {}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
 
     if !deleted {
         return Err((StatusCode::NOT_FOUND, format!("Agent '{}' not found", id)));

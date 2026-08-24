@@ -28,15 +28,20 @@ pub fn commit_all(repo: &git2::Repository, message: &str) -> Result<String> {
     let parent = match repo.head() {
         Ok(head) => {
             let commit_oid = head.target().context("No target on HEAD")?;
-            Some(repo.find_commit(commit_oid).context("Failed to find parent commit")?)
+            Some(
+                repo.find_commit(commit_oid)
+                    .context("Failed to find parent commit")?,
+            )
         }
         Err(_) => None,
     };
 
     let commit_oid = match &parent {
-        Some(p) => repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[p])
+        Some(p) => repo
+            .commit(Some("HEAD"), &signature, &signature, message, &tree, &[p])
             .context("Failed to commit (with parent)")?,
-        None => repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[])
+        None => repo
+            .commit(Some("HEAD"), &signature, &signature, message, &tree, &[])
             .context("Failed to commit (initial)")?,
     };
 
@@ -58,12 +63,19 @@ pub fn head_commit(repo: &git2::Repository) -> Result<Option<String>> {
 pub fn has_uncommitted(repo: &git2::Repository) -> Result<bool> {
     let mut opts = git2::StatusOptions::new();
     opts.include_untracked(true);
-    let statuses = repo.statuses(Some(&mut opts)).context("Failed to get status")?;
+    let statuses = repo
+        .statuses(Some(&mut opts))
+        .context("Failed to get status")?;
     Ok(!statuses.is_empty())
 }
 
 /// Clone a remote repository
-pub fn clone_remote(url: &str, path: &Path, branch: &str, _auth_token: Option<&str>) -> Result<git2::Repository> {
+pub fn clone_remote(
+    url: &str,
+    path: &Path,
+    branch: &str,
+    _auth_token: Option<&str>,
+) -> Result<git2::Repository> {
     let mut fetch_opts = git2::FetchOptions::new();
     fetch_opts.download_tags(git2::AutotagOption::All);
 
@@ -98,7 +110,9 @@ pub fn pull(repo: &git2::Repository, branch: &str) -> Result<String> {
     let remote_ref = repo
         .find_reference(&remote_branch)
         .context(format!("Remote branch '{}' not found", remote_branch))?;
-    let remote_commit = remote_ref.peel_to_commit().context("Failed to peel remote ref")?;
+    let remote_commit = remote_ref
+        .peel_to_commit()
+        .context("Failed to peel remote ref")?;
     let remote_oid = remote_commit.id();
 
     // Fast-forward or reset to remote
@@ -131,7 +145,9 @@ pub fn push(repo: &git2::Repository, branch: &str) -> Result<()> {
     let mut push_opts = git2::PushOptions::new();
     let refspec = format!("refs/heads/{}:refs/heads/{}", branch, branch);
 
-    remote.push(&[&refspec], Some(&mut push_opts)).context("Failed to push")?;
+    remote
+        .push(&[&refspec], Some(&mut push_opts))
+        .context("Failed to push")?;
 
     Ok(())
 }
@@ -139,10 +155,7 @@ pub fn push(repo: &git2::Repository, branch: &str) -> Result<()> {
 /// Get working tree diff against HEAD
 pub fn get_diff(repo: &git2::Repository) -> Result<crate::models::GitDiff> {
     let tree = match repo.head() {
-        Ok(head) => {
-            head.peel_to_commit().ok()
-                .and_then(|c| c.tree().ok())
-        }
+        Ok(head) => head.peel_to_commit().ok().and_then(|c| c.tree().ok()),
         Err(_) => None,
     };
 
@@ -169,7 +182,8 @@ pub fn get_diff(repo: &git2::Repository) -> Result<crate::models::GitDiff> {
         None,
         None,
         Some(&mut |_delta, _hunk, _line| true),
-    ).ok();
+    )
+    .ok();
 
     diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
         match line.origin() {
@@ -181,7 +195,8 @@ pub fn get_diff(repo: &git2::Repository) -> Result<crate::models::GitDiff> {
             diff_text.push_str(text);
         }
         true
-    }).ok();
+    })
+    .ok();
 
     Ok(crate::models::GitDiff {
         files_changed,

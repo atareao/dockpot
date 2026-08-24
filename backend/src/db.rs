@@ -89,7 +89,12 @@ impl Database {
         Ok(row.map(Stack::from))
     }
 
-    pub async fn create_stack(&self, name: &str, description: Option<&str>, compose: &str) -> Result<Stack> {
+    pub async fn create_stack(
+        &self,
+        name: &str,
+        description: Option<&str>,
+        compose: &str,
+    ) -> Result<Stack> {
         let now = Utc::now().to_rfc3339();
         let id = Uuid::new_v4().to_string();
         let stacks_path = Path::new(&self.stacks_dir).join(&id);
@@ -108,21 +113,35 @@ impl Database {
         .execute(&self.pool).await?;
 
         Ok(Stack {
-            id, name: name.to_string(),
+            id,
+            name: name.to_string(),
             description: description.map(|s| s.to_string()),
             compose: compose.to_string(),
-            status: "stopped".into(), path: path_str,
-            created_at: now.clone(), updated_at: now,
+            status: "stopped".into(),
+            path: path_str,
+            created_at: now.clone(),
+            updated_at: now,
         })
     }
 
-    pub async fn update_stack(&self, id: &str, name: &str, description: Option<&str>, compose: &str) -> Result<bool> {
+    pub async fn update_stack(
+        &self,
+        id: &str,
+        name: &str,
+        description: Option<&str>,
+        compose: &str,
+    ) -> Result<bool> {
         let now = Utc::now().to_rfc3339();
         let rows = sqlx::query(
             "UPDATE stacks SET name=?, description=?, compose=?, updated_at=? WHERE id=?",
         )
-        .bind(name).bind(description).bind(compose).bind(&now).bind(id)
-        .execute(&self.pool).await?;
+        .bind(name)
+        .bind(description)
+        .bind(compose)
+        .bind(&now)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
 
         if let Ok(Some(stack)) = self.get_stack(id).await {
             let compose_path = Path::new(&stack.path).join("compose.yaml");
@@ -134,8 +153,11 @@ impl Database {
     pub async fn update_status(&self, id: &str, status: &str) -> Result<bool> {
         let now = Utc::now().to_rfc3339();
         let rows = sqlx::query("UPDATE stacks SET status=?, updated_at=? WHERE id=?")
-            .bind(status).bind(&now).bind(id)
-            .execute(&self.pool).await?;
+            .bind(status)
+            .bind(&now)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(rows.rows_affected() > 0)
     }
 
@@ -144,7 +166,9 @@ impl Database {
             let _ = tokio::fs::remove_dir_all(&stack.path).await;
         }
         let rows = sqlx::query("DELETE FROM stacks WHERE id=?")
-            .bind(id).execute(&self.pool).await?;
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(rows.rows_affected() > 0)
     }
 
@@ -175,7 +199,12 @@ impl Database {
         Ok(())
     }
 
-    pub async fn update_sync_status(&self, stack_id: &str, status: &str, last_commit: Option<&str>) -> Result<()> {
+    pub async fn update_sync_status(
+        &self,
+        stack_id: &str,
+        status: &str,
+        last_commit: Option<&str>,
+    ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         sqlx::query(
             "UPDATE stack_sync SET status=?, last_commit=COALESCE(?, last_commit), last_synced_at=? WHERE stack_id=?",
@@ -203,7 +232,12 @@ impl Database {
         Ok(rows.into_iter().map(EnvFile::from).collect())
     }
 
-    pub async fn upsert_env_file(&self, stack_id: &str, filename: &str, content: &str) -> Result<EnvFile> {
+    pub async fn upsert_env_file(
+        &self,
+        stack_id: &str,
+        filename: &str,
+        content: &str,
+    ) -> Result<EnvFile> {
         let now = Utc::now().to_rfc3339();
         let id = Uuid::new_v4().to_string();
         sqlx::query(
@@ -221,16 +255,21 @@ impl Database {
         }
 
         Ok(EnvFile {
-            id, stack_id: stack_id.to_string(),
-            filename: filename.to_string(), content: content.to_string(),
-            created_at: now.clone(), updated_at: now,
+            id,
+            stack_id: stack_id.to_string(),
+            filename: filename.to_string(),
+            content: content.to_string(),
+            created_at: now.clone(),
+            updated_at: now,
         })
     }
 
     pub async fn delete_env_file(&self, stack_id: &str, filename: &str) -> Result<bool> {
         let rows = sqlx::query("DELETE FROM env_files WHERE stack_id=? AND filename=?")
-            .bind(stack_id).bind(filename)
-            .execute(&self.pool).await?;
+            .bind(stack_id)
+            .bind(filename)
+            .execute(&self.pool)
+            .await?;
         if let Ok(Some(stack)) = self.get_stack(stack_id).await {
             let env_path = Path::new(&stack.path).join(filename);
             let _ = tokio::fs::remove_file(&env_path).await;
@@ -252,13 +291,21 @@ impl Database {
         Ok(())
     }
 
-    pub async fn get_logs(&self, stack_id: &str, limit: i64, offset: i64) -> Result<Vec<(String, String, String)>> {
+    pub async fn get_logs(
+        &self,
+        stack_id: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<(String, String, String)>> {
         let rows: Vec<(String, String, String)> = sqlx::query_as(
             "SELECT content, level, created_at FROM log_history \
              WHERE stack_id=? ORDER BY id DESC LIMIT ? OFFSET ?",
         )
-        .bind(stack_id).bind(limit).bind(offset)
-        .fetch_all(&self.pool).await?;
+        .bind(stack_id)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await?;
         Ok(rows)
     }
 
@@ -305,24 +352,35 @@ impl Database {
 
     pub async fn delete_notifier(&self, id: &str) -> Result<bool> {
         let rows = sqlx::query("DELETE FROM notifiers WHERE id=?")
-            .bind(id).execute(&self.pool).await?;
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(rows.rows_affected() > 0)
     }
 
     pub async fn set_stack_notifiers(&self, stack_id: &str, notifier_ids: &[String]) -> Result<()> {
         sqlx::query("DELETE FROM stack_notifiers WHERE stack_id=?")
-            .bind(stack_id).execute(&self.pool).await?;
+            .bind(stack_id)
+            .execute(&self.pool)
+            .await?;
         for nid in notifier_ids {
-            sqlx::query("INSERT OR IGNORE INTO stack_notifiers (stack_id, notifier_id) VALUES (?, ?)")
-                .bind(stack_id).bind(nid).execute(&self.pool).await?;
+            sqlx::query(
+                "INSERT OR IGNORE INTO stack_notifiers (stack_id, notifier_id) VALUES (?, ?)",
+            )
+            .bind(stack_id)
+            .bind(nid)
+            .execute(&self.pool)
+            .await?;
         }
         Ok(())
     }
 
     pub async fn get_stack_notifier_ids(&self, stack_id: &str) -> Result<Vec<String>> {
-        let rows: Vec<(String,)> = sqlx::query_as(
-            "SELECT notifier_id FROM stack_notifiers WHERE stack_id=?",
-        ).bind(stack_id).fetch_all(&self.pool).await?;
+        let rows: Vec<(String,)> =
+            sqlx::query_as("SELECT notifier_id FROM stack_notifiers WHERE stack_id=?")
+                .bind(stack_id)
+                .fetch_all(&self.pool)
+                .await?;
         Ok(rows.into_iter().map(|(id,)| id).collect())
     }
 
@@ -332,7 +390,9 @@ impl Database {
         let row: Option<(Option<String>, i64)> = sqlx::query_as(
             "SELECT last_started_at, total_running_seconds FROM stack_stats WHERE stack_id=?",
         )
-        .bind(stack_id).fetch_optional(&self.pool).await?;
+        .bind(stack_id)
+        .fetch_optional(&self.pool)
+        .await?;
         Ok(row.map(|(started, secs)| StackStats {
             stack_id: stack_id.to_string(),
             last_started_at: started,
@@ -379,27 +439,39 @@ impl Database {
         // Docker info from CLI
         let docker_version = tokio::process::Command::new("docker")
             .args(["version", "--format", "{{.Server.Version}}"])
-            .output().await.ok()
+            .output()
+            .await
+            .ok()
             .and_then(|o| {
                 let v = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                if v.is_empty() { None } else { Some(v) }
+                if v.is_empty() {
+                    None
+                } else {
+                    Some(v)
+                }
             });
 
         let docker_containers = tokio::process::Command::new("docker")
             .args(["ps", "-q"])
-            .output().await.ok()
+            .output()
+            .await
+            .ok()
             .map(|o| {
                 let out = String::from_utf8_lossy(&o.stdout);
                 out.lines().filter(|l| !l.is_empty()).count() as u64
-            }).unwrap_or(0);
+            })
+            .unwrap_or(0);
 
         let docker_images = tokio::process::Command::new("docker")
             .args(["images", "-q"])
-            .output().await.ok()
+            .output()
+            .await
+            .ok()
             .map(|o| {
                 let out = String::from_utf8_lossy(&o.stdout);
                 out.lines().filter(|l| !l.is_empty()).count() as u64
-            }).unwrap_or(0);
+            })
+            .unwrap_or(0);
 
         // Recent activity from log_history
         let recent: Vec<(String, String)> = sqlx::query_as(
@@ -437,7 +509,9 @@ impl Database {
 
     pub async fn get_setting(&self, key: &str) -> Result<Option<String>> {
         sqlx::query_scalar("SELECT value FROM settings WHERE key=?")
-            .bind(key).fetch_optional(&self.pool).await
+            .bind(key)
+            .fetch_optional(&self.pool)
+            .await
             .context("Failed to get setting")
     }
 
@@ -496,7 +570,9 @@ impl Database {
 
     pub async fn delete_agent(&self, id: &str) -> Result<bool> {
         let rows = sqlx::query("DELETE FROM agents WHERE id=?")
-            .bind(id).execute(&self.pool).await?;
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
         Ok(rows.rows_affected() > 0)
     }
 
@@ -507,13 +583,17 @@ impl Database {
             "SELECT id, enabled, cron_expression, retention_days, include_git, include_env, \
              last_run_at, last_status, created_at, updated_at FROM backup_schedules LIMIT 1",
         )
-        .fetch_optional(&self.pool).await?;
+        .fetch_optional(&self.pool)
+        .await?;
         Ok(row.map(BackupSchedule::from))
     }
 
     pub async fn upsert_backup_schedule(&self, s: &BackupSchedule) -> Result<()> {
         let existing = self.get_backup_schedule().await?;
-        let id = existing.as_ref().map(|e| e.id.clone()).unwrap_or_else(|| s.id.clone());
+        let id = existing
+            .as_ref()
+            .map(|e| e.id.clone())
+            .unwrap_or_else(|| s.id.clone());
         let now = chrono::Utc::now().to_rfc3339();
         sqlx::query(
             "INSERT INTO backup_schedules (id, enabled, cron_expression, retention_days, include_git, include_env, \
@@ -532,25 +612,34 @@ impl Database {
     pub async fn update_backup_status(&self, status: &str) -> Result<()> {
         let now = chrono::Utc::now().to_rfc3339();
         sqlx::query("UPDATE backup_schedules SET last_run_at=?, last_status=?")
-            .bind(&now).bind(status)
-            .execute(&self.pool).await?;
+            .bind(&now)
+            .bind(status)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 
     pub async fn run_backup(&self) -> Result<String, String> {
-        let schedule = self.get_backup_schedule().await
+        let schedule = self
+            .get_backup_schedule()
+            .await
             .map_err(|e| format!("DB error: {}", e))?;
         let backup_dir = std::path::Path::new("data").join("backups");
-        tokio::fs::create_dir_all(&backup_dir).await
+        tokio::fs::create_dir_all(&backup_dir)
+            .await
             .map_err(|e| format!("Failed to create backup dir: {}", e))?;
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
         let filename = format!("dockpot-backup-{}.zip", timestamp);
         let output_path = backup_dir.join(&filename);
         let tmp_dir = std::env::temp_dir().join(format!("dockpot-backup-{}", timestamp));
-        tokio::fs::create_dir_all(&tmp_dir).await
+        tokio::fs::create_dir_all(&tmp_dir)
+            .await
             .map_err(|e| format!("Failed to create temp dir: {}", e))?;
 
-        let stacks = self.list_stacks().await.map_err(|e| format!("List stacks: {}", e))?;
+        let stacks = self
+            .list_stacks()
+            .await
+            .map_err(|e| format!("List stacks: {}", e))?;
         for stack in &stacks {
             let src = std::path::Path::new(&stack.path);
             let dst = tmp_dir.join(&stack.name);
@@ -567,7 +656,8 @@ impl Database {
         }
         let _ = std::process::Command::new("zip")
             .args(["-r", output_path.to_str().unwrap_or(""), "."])
-            .current_dir(&tmp_dir).output();
+            .current_dir(&tmp_dir)
+            .output();
         let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
 
         if let Some(ref sched) = schedule {
@@ -588,9 +678,17 @@ impl Database {
                 }
             }
         }
-        self.update_backup_status("ok").await.map_err(|e| format!("Status update: {}", e))?;
+        self.update_backup_status("ok")
+            .await
+            .map_err(|e| format!("Status update: {}", e))?;
         tracing::info!("📦 Backup created: {}", output_path.display());
-        self.append_logs("system", &format!("📦 Backup created: {}\n", filename), "info").await.ok();
+        self.append_logs(
+            "system",
+            &format!("📦 Backup created: {}\n", filename),
+            "info",
+        )
+        .await
+        .ok();
         Ok(output_path.to_string_lossy().to_string())
     }
 }

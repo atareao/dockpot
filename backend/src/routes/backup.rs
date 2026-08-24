@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use axum::extract::State;
-use axum::Json;
 use axum::http::StatusCode;
+use axum::Json;
 use serde_json::Value;
 
 use crate::auth::AppState;
@@ -11,7 +11,10 @@ use crate::models::BackupSchedule;
 pub async fn get_config(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    let config = state.db.get_backup_schedule().await
+    let config = state
+        .db
+        .get_backup_schedule()
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(serde_json::json!(config)))
 }
@@ -21,10 +24,22 @@ pub async fn upsert_config(
     Json(req): Json<serde_json::Value>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let enabled = req.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
-    let cron = req.get("cron_expression").and_then(|v| v.as_str()).unwrap_or("0 3 * * *");
-    let retention = req.get("retention_days").and_then(|v| v.as_i64()).unwrap_or(30);
-    let include_git = req.get("include_git").and_then(|v| v.as_bool()).unwrap_or(true);
-    let include_env = req.get("include_env").and_then(|v| v.as_bool()).unwrap_or(true);
+    let cron = req
+        .get("cron_expression")
+        .and_then(|v| v.as_str())
+        .unwrap_or("0 3 * * *");
+    let retention = req
+        .get("retention_days")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(30);
+    let include_git = req
+        .get("include_git")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    let include_env = req
+        .get("include_env")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
 
     let now = chrono::Utc::now().to_rfc3339();
     let schedule = BackupSchedule {
@@ -40,7 +55,10 @@ pub async fn upsert_config(
         updated_at: now,
     };
 
-    state.db.upsert_backup_schedule(&schedule).await
+    state
+        .db
+        .upsert_backup_schedule(&schedule)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(serde_json::json!(schedule)))

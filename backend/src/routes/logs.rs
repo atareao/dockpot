@@ -21,7 +21,9 @@ async fn handle_logs_socket(mut socket: WebSocket, state: Arc<AppState>, id: Str
     let stack = match state.db.get_stack(&id).await {
         Ok(Some(s)) => s,
         Ok(None) => {
-            let _ = socket.send(Message::Text("❌ Stack not found".into())).await;
+            let _ = socket
+                .send(Message::Text("❌ Stack not found".into()))
+                .await;
             return;
         }
         Err(e) => {
@@ -36,7 +38,15 @@ async fn handle_logs_socket(mut socket: WebSocket, state: Arc<AppState>, id: Str
 
     // Spawn docker compose logs -f
     let mut child = match Command::new("docker")
-        .args(["compose", "-f", &compose_path, "logs", "-f", "--tail=100", "--no-color"])
+        .args([
+            "compose",
+            "-f",
+            &compose_path,
+            "logs",
+            "-f",
+            "--tail=100",
+            "--no-color",
+        ])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .kill_on_drop(true)
@@ -45,7 +55,9 @@ async fn handle_logs_socket(mut socket: WebSocket, state: Arc<AppState>, id: Str
         Ok(c) => c,
         Err(e) => {
             let _ = socket
-                .send(Message::Text(format!("❌ Failed to spawn docker: {}", e).into()))
+                .send(Message::Text(
+                    format!("❌ Failed to spawn docker: {}", e).into(),
+                ))
                 .await;
             return;
         }
