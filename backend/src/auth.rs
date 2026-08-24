@@ -135,10 +135,7 @@ pub struct OidcState {
 
 // ───── Auth Middleware ─────
 
-pub async fn require_auth(
-    mut req: Request,
-    next: Next,
-) -> Result<Response, AuthError> {
+pub async fn require_auth(mut req: Request, next: Next) -> Result<Response, AuthError> {
     let state = req
         .extensions()
         .get::<Arc<AppState>>()
@@ -177,15 +174,18 @@ pub async fn require_auth(
         None => {
             // Try cookie as fallback
             let cookie_header = req.headers().get("Cookie").and_then(|v| v.to_str().ok());
-            let token_from_cookie = cookie_header
-                .and_then(|c| {
-                    c.split(';')
-                        .find(|part| part.trim().starts_with("token="))
-                        .map(|part| part.trim().trim_start_matches("token="))
-                });
+            let token_from_cookie = cookie_header.and_then(|c| {
+                c.split(';')
+                    .find(|part| part.trim().starts_with("token="))
+                    .map(|part| part.trim().trim_start_matches("token="))
+            });
             match token_from_cookie {
                 Some(t) => t,
-                None => return Err(AuthError::Unauthorized("Missing authentication token".into())),
+                None => {
+                    return Err(AuthError::Unauthorized(
+                        "Missing authentication token".into(),
+                    ))
+                }
             }
         }
     };
@@ -209,10 +209,11 @@ pub enum AuthError {
 impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
         match self {
-            Self::Unauthorized(msg) => {
-                (StatusCode::UNAUTHORIZED, serde_json::json!({"error": msg}).to_string())
-                    .into_response()
-            }
+            Self::Unauthorized(msg) => (
+                StatusCode::UNAUTHORIZED,
+                serde_json::json!({"error": msg}).to_string(),
+            )
+                .into_response(),
         }
     }
 }

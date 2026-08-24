@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
 use axum::body::Body;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 
@@ -11,7 +11,10 @@ pub async fn export_zip(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Response, (StatusCode, String)> {
-    let stack = state.db.get_stack(&id).await
+    let stack = state
+        .db
+        .get_stack(&id)
+        .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("Stack '{}' not found", id)))?;
 
@@ -39,7 +42,11 @@ pub async fn export_zip(
     let git_dst = tmp_dir.join(".git");
     if git_src.exists() {
         let _ = std::process::Command::new("cp")
-            .args(["-r", git_src.to_str().unwrap_or(""), git_dst.to_str().unwrap_or("")])
+            .args([
+                "-r",
+                git_src.to_str().unwrap_or(""),
+                git_dst.to_str().unwrap_or(""),
+            ])
             .output();
     }
 
@@ -51,8 +58,12 @@ pub async fn export_zip(
         .output();
 
     // Read zip
-    let data = tokio::fs::read(&zip_path).await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to read zip: {}", e)))?;
+    let data = tokio::fs::read(&zip_path).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to read zip: {}", e),
+        )
+    })?;
 
     // Cleanup temp
     let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
@@ -61,7 +72,10 @@ pub async fn export_zip(
     let filename = format!("{}-stack.zip", &stack.name);
     let response = Response::builder()
         .header("Content-Type", "application/zip")
-        .header("Content-Disposition", format!("attachment; filename=\"{}\"", filename))
+        .header(
+            "Content-Disposition",
+            format!("attachment; filename=\"{}\"", filename),
+        )
         .body(Body::from(data))
         .unwrap();
 

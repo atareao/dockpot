@@ -61,7 +61,10 @@ async fn main() {
         .build()
         .unwrap();
     match check_client
-        .get(&format!("{}/.well-known/openid-configuration", config.oidc_issuer_url.trim_end_matches('/')))
+        .get(&format!(
+            "{}/.well-known/openid-configuration",
+            config.oidc_issuer_url.trim_end_matches('/')
+        ))
         .send()
         .await
     {
@@ -226,12 +229,16 @@ async fn sync_scheduler_loop(db: dockpot::db::Database) {
             match dockpot::git::sync::pull(&repo, &sync.remote_branch) {
                 Ok(msg) => {
                     let commit = dockpot::git::sync::head_commit(&repo).ok().flatten();
-                    db.update_sync_status(&sync.stack_id, "synced", commit.as_deref()).await.ok();
+                    db.update_sync_status(&sync.stack_id, "synced", commit.as_deref())
+                        .await
+                        .ok();
                     tracing::debug!("Sync for '{}': {}", stack.name, msg);
                 }
                 Err(e) => {
                     tracing::warn!("Sync failed for '{}': {}", stack.name, e);
-                    db.update_sync_status(&sync.stack_id, "conflict", None).await.ok();
+                    db.update_sync_status(&sync.stack_id, "conflict", None)
+                        .await
+                        .ok();
                 }
             }
         }

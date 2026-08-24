@@ -18,7 +18,13 @@ pub struct TemplateVariable {
     pub required: bool,
 }
 
-fn t(name: &str, desc: &str, category: &str, compose: &str, vars: Vec<TemplateVariable>) -> Template {
+fn t(
+    name: &str,
+    desc: &str,
+    category: &str,
+    compose: &str,
+    vars: Vec<TemplateVariable>,
+) -> Template {
     Template {
         name: name.to_string(),
         description: desc.to_string(),
@@ -39,7 +45,11 @@ fn v(name: &str, desc: &str, default: &str, required: bool) -> TemplateVariable 
 
 pub fn get_templates() -> Vec<Template> {
     vec![
-        t("nginx", "Nginx web server with static content", "web", r#"services:
+        t(
+            "nginx",
+            "Nginx web server with static content",
+            "web",
+            r#"services:
   nginx:
     image: nginx:${NGINX_TAG:-alpine}
     container_name: ${STACK_NAME}-nginx
@@ -50,14 +60,25 @@ pub fn get_templates() -> Vec<Template> {
       - ${NGINX_CONF_DIR:-./nginx/conf.d}:/etc/nginx/conf.d:ro
       - ${NGINX_HTML_DIR:-./nginx/html}:/usr/share/nginx/html:ro
     restart: unless-stopped
-"#, vec![
-            v("NGINX_TAG", "Nginx image tag", "alpine", false),
-            v("NGINX_HTTP_PORT", "HTTP port", "80", false),
-            v("NGINX_HTTPS_PORT", "HTTPS port", "443", false),
-            v("NGINX_CONF_DIR", "Config directory", "./nginx/conf.d", false),
-            v("NGINX_HTML_DIR", "HTML directory", "./nginx/html", false),
-        ]),
-        t("postgres", "PostgreSQL database server", "database", r#"services:
+"#,
+            vec![
+                v("NGINX_TAG", "Nginx image tag", "alpine", false),
+                v("NGINX_HTTP_PORT", "HTTP port", "80", false),
+                v("NGINX_HTTPS_PORT", "HTTPS port", "443", false),
+                v(
+                    "NGINX_CONF_DIR",
+                    "Config directory",
+                    "./nginx/conf.d",
+                    false,
+                ),
+                v("NGINX_HTML_DIR", "HTML directory", "./nginx/html", false),
+            ],
+        ),
+        t(
+            "postgres",
+            "PostgreSQL database server",
+            "database",
+            r#"services:
   postgres:
     image: postgres:${POSTGRES_TAG:-16-alpine}
     container_name: ${STACK_NAME}-postgres
@@ -70,15 +91,26 @@ pub fn get_templates() -> Vec<Template> {
     volumes:
       - ${POSTGRES_DATA_DIR:-./postgres/data}:/var/lib/postgresql/data
     restart: unless-stopped
-"#, vec![
-            v("POSTGRES_TAG", "PostgreSQL image tag", "16-alpine", false),
-            v("POSTGRES_DB", "Database name", "app", false),
-            v("POSTGRES_USER", "Database user", "app", false),
-            v("POSTGRES_PASSWORD", "Database password", "", true),
-            v("POSTGRES_PORT", "Port", "5432", false),
-            v("POSTGRES_DATA_DIR", "Data directory", "./postgres/data", false),
-        ]),
-        t("redis", "Redis key-value store", "database", r#"services:
+"#,
+            vec![
+                v("POSTGRES_TAG", "PostgreSQL image tag", "16-alpine", false),
+                v("POSTGRES_DB", "Database name", "app", false),
+                v("POSTGRES_USER", "Database user", "app", false),
+                v("POSTGRES_PASSWORD", "Database password", "", true),
+                v("POSTGRES_PORT", "Port", "5432", false),
+                v(
+                    "POSTGRES_DATA_DIR",
+                    "Data directory",
+                    "./postgres/data",
+                    false,
+                ),
+            ],
+        ),
+        t(
+            "redis",
+            "Redis key-value store",
+            "database",
+            r#"services:
   redis:
     image: redis:${REDIS_TAG:-7-alpine}
     container_name: ${STACK_NAME}-redis
@@ -88,13 +120,24 @@ pub fn get_templates() -> Vec<Template> {
     volumes:
       - ${REDIS_DATA_DIR:-./redis/data}:/data
     restart: unless-stopped
-"#, vec![
-            v("REDIS_TAG", "Redis image tag", "7-alpine", false),
-            v("REDIS_PASSWORD", "Redis password (leave empty for none)", "", false),
-            v("REDIS_PORT", "Redis port", "6379", false),
-            v("REDIS_DATA_DIR", "Data directory", "./redis/data", false),
-        ]),
-        t("traefik", "Traefik reverse proxy with HTTPS", "proxy", r#"services:
+"#,
+            vec![
+                v("REDIS_TAG", "Redis image tag", "7-alpine", false),
+                v(
+                    "REDIS_PASSWORD",
+                    "Redis password (leave empty for none)",
+                    "",
+                    false,
+                ),
+                v("REDIS_PORT", "Redis port", "6379", false),
+                v("REDIS_DATA_DIR", "Data directory", "./redis/data", false),
+            ],
+        ),
+        t(
+            "traefik",
+            "Traefik reverse proxy with HTTPS",
+            "proxy",
+            r#"services:
   traefik:
     image: traefik:${TRAEFIK_TAG:-v3.1}
     container_name: ${STACK_NAME}-traefik
@@ -119,15 +162,31 @@ pub fn get_templates() -> Vec<Template> {
       - "traefik.http.routers.dashboard.service=api@internal"
       - "traefik.http.routers.dashboard.middlewares=auth"
     restart: unless-stopped
-"#, vec![
-            v("TRAEFIK_TAG", "Traefik image tag", "v3.1", false),
-            v("LETSENCRYPT_EMAIL", "Email for Let's Encrypt", "", true),
-            v("HTTP_PORT", "HTTP port", "80", false),
-            v("HTTPS_PORT", "HTTPS port", "443", false),
-            v("DASHBOARD_DOMAIN", "Dashboard domain", "traefik.example.com", false),
-            v("LETSENCRYPT_DIR", "Let's Encrypt data directory", "./traefik/letsencrypt", false),
-        ]),
-        t("mariadb", "MariaDB database server", "database", r#"services:
+"#,
+            vec![
+                v("TRAEFIK_TAG", "Traefik image tag", "v3.1", false),
+                v("LETSENCRYPT_EMAIL", "Email for Let's Encrypt", "", true),
+                v("HTTP_PORT", "HTTP port", "80", false),
+                v("HTTPS_PORT", "HTTPS port", "443", false),
+                v(
+                    "DASHBOARD_DOMAIN",
+                    "Dashboard domain",
+                    "traefik.example.com",
+                    false,
+                ),
+                v(
+                    "LETSENCRYPT_DIR",
+                    "Let's Encrypt data directory",
+                    "./traefik/letsencrypt",
+                    false,
+                ),
+            ],
+        ),
+        t(
+            "mariadb",
+            "MariaDB database server",
+            "database",
+            r#"services:
   mariadb:
     image: mariadb:${MARIADB_TAG:-11}
     container_name: ${STACK_NAME}-mariadb
@@ -141,16 +200,27 @@ pub fn get_templates() -> Vec<Template> {
     volumes:
       - ${MARIADB_DATA_DIR:-./mariadb/data}:/var/lib/mysql
     restart: unless-stopped
-"#, vec![
-            v("MARIADB_TAG", "MariaDB image tag", "11", false),
-            v("MARIADB_DATABASE", "Database name", "app", false),
-            v("MARIADB_USER", "Database user", "app", false),
-            v("MARIADB_PASSWORD", "Database password", "", true),
-            v("MARIADB_ROOT_PASSWORD", "Root password", "", true),
-            v("MARIADB_PORT", "Port", "3306", false),
-            v("MARIADB_DATA_DIR", "Data directory", "./mariadb/data", false),
-        ]),
-        t("mongodb", "MongoDB document database", "database", r#"services:
+"#,
+            vec![
+                v("MARIADB_TAG", "MariaDB image tag", "11", false),
+                v("MARIADB_DATABASE", "Database name", "app", false),
+                v("MARIADB_USER", "Database user", "app", false),
+                v("MARIADB_PASSWORD", "Database password", "", true),
+                v("MARIADB_ROOT_PASSWORD", "Root password", "", true),
+                v("MARIADB_PORT", "Port", "3306", false),
+                v(
+                    "MARIADB_DATA_DIR",
+                    "Data directory",
+                    "./mariadb/data",
+                    false,
+                ),
+            ],
+        ),
+        t(
+            "mongodb",
+            "MongoDB document database",
+            "database",
+            r#"services:
   mongodb:
     image: mongo:${MONGO_TAG:-7}
     container_name: ${STACK_NAME}-mongodb
@@ -162,14 +232,20 @@ pub fn get_templates() -> Vec<Template> {
     volumes:
       - ${MONGO_DATA_DIR:-./mongodb/data}:/data/db
     restart: unless-stopped
-"#, vec![
-            v("MONGO_TAG", "MongoDB image tag", "7", false),
-            v("MONGO_USER", "Admin username", "admin", false),
-            v("MONGO_PASSWORD", "Admin password", "", true),
-            v("MONGO_PORT", "Port", "27017", false),
-            v("MONGO_DATA_DIR", "Data directory", "./mongodb/data", false),
-        ]),
-        t("node-app", "Node.js application with PM2", "app", r#"services:
+"#,
+            vec![
+                v("MONGO_TAG", "MongoDB image tag", "7", false),
+                v("MONGO_USER", "Admin username", "admin", false),
+                v("MONGO_PASSWORD", "Admin password", "", true),
+                v("MONGO_PORT", "Port", "27017", false),
+                v("MONGO_DATA_DIR", "Data directory", "./mongodb/data", false),
+            ],
+        ),
+        t(
+            "node-app",
+            "Node.js application with PM2",
+            "app",
+            r#"services:
   app:
     build:
       context: ${BUILD_CONTEXT:-.}
@@ -184,16 +260,22 @@ pub fn get_templates() -> Vec<Template> {
     volumes:
       - ${APP_DATA_DIR:-./app/data}:/app/data
     restart: unless-stopped
-"#, vec![
-            v("BUILD_CONTEXT", "Docker build context", ".", false),
-            v("IMAGE_NAME", "Image name", "app", false),
-            v("IMAGE_TAG", "Image tag", "latest", false),
-            v("NODE_ENV", "Node environment", "production", false),
-            v("HOST_PORT", "Host port", "3000", false),
-            v("APP_PORT", "App port", "3000", false),
-            v("APP_DATA_DIR", "Data directory", "./app/data", false),
-        ]),
-        t("portainer", "Portainer Docker management UI", "management", r#"services:
+"#,
+            vec![
+                v("BUILD_CONTEXT", "Docker build context", ".", false),
+                v("IMAGE_NAME", "Image name", "app", false),
+                v("IMAGE_TAG", "Image tag", "latest", false),
+                v("NODE_ENV", "Node environment", "production", false),
+                v("HOST_PORT", "Host port", "3000", false),
+                v("APP_PORT", "App port", "3000", false),
+                v("APP_DATA_DIR", "Data directory", "./app/data", false),
+            ],
+        ),
+        t(
+            "portainer",
+            "Portainer Docker management UI",
+            "management",
+            r#"services:
   portainer:
     image: portainer/portainer-ce:${PORTAINER_TAG:-latest}
     container_name: ${STACK_NAME}-portainer
@@ -204,11 +286,18 @@ pub fn get_templates() -> Vec<Template> {
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${PORTAINER_DATA:-./portainer/data}:/data
     restart: unless-stopped
-"#, vec![
-            v("PORTAINER_TAG", "Portainer image tag", "latest", false),
-            v("PORTAINER_PORT", "Web UI port", "9000", false),
-            v("PORTAINER_DATA", "Data directory", "./portainer/data", false),
-        ]),
+"#,
+            vec![
+                v("PORTAINER_TAG", "Portainer image tag", "latest", false),
+                v("PORTAINER_PORT", "Web UI port", "9000", false),
+                v(
+                    "PORTAINER_DATA",
+                    "Data directory",
+                    "./portainer/data",
+                    false,
+                ),
+            ],
+        ),
     ]
 }
 
@@ -275,7 +364,11 @@ mod tests {
     fn test_postgres_has_required_password() {
         let templates = get_templates();
         let pg = templates.iter().find(|t| t.name == "postgres").unwrap();
-        let pw_var = pg.variables.iter().find(|v| v.name == "POSTGRES_PASSWORD").unwrap();
+        let pw_var = pg
+            .variables
+            .iter()
+            .find(|v| v.name == "POSTGRES_PASSWORD")
+            .unwrap();
         assert!(pw_var.required);
     }
 
@@ -294,7 +387,11 @@ mod tests {
     #[test]
     fn test_all_templates_have_category() {
         for t in get_templates() {
-            assert!(!t.category.is_empty(), "Template '{}' has no category", t.name);
+            assert!(
+                !t.category.is_empty(),
+                "Template '{}' has no category",
+                t.name
+            );
         }
     }
 

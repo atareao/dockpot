@@ -1,9 +1,9 @@
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use axum::extract::{Path, State};
-use axum::Json;
 use axum::http::StatusCode;
+use axum::Json;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -22,8 +22,15 @@ pub async fn get_template(
     Path(name): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let templates = templates::get_templates();
-    let tpl = templates.into_iter().find(|t| t.name == name)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("Template '{}' not found", name)))?;
+    let tpl = templates
+        .into_iter()
+        .find(|t| t.name == name)
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("Template '{}' not found", name),
+            )
+        })?;
     Ok(Json(serde_json::json!(tpl)))
 }
 
@@ -39,8 +46,15 @@ pub async fn render_template(
     Json(req): Json<RenderRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let templates = templates::get_templates();
-    let tpl = templates.into_iter().find(|t| t.name == req.template)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("Template '{}' not found", req.template)))?;
+    let tpl = templates
+        .into_iter()
+        .find(|t| t.name == req.template)
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("Template '{}' not found", req.template),
+            )
+        })?;
 
     let vars = req.variables.unwrap_or_default();
     let compose = templates::fill_template(&tpl.compose, &req.stack_name, &vars);

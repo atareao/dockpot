@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Modal, Input, Typography, Space, Button, Tag, Spin, Card, App as AntApp } from 'antd';
-import { api, Notifier } from '../api/http';
+import { useState, useEffect } from 'react';
+import { Modal, Input, Typography, Space, Button, Tag, Spin, App as AntApp } from 'antd';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 interface Template {
   name: string;

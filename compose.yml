@@ -1,0 +1,62 @@
+# ═══════════════════════════════════════════════════════════════
+# Dockpot — Docker Stack Manager
+# ═══════════════════════════════════════════════════════════════
+#
+# Uso:
+#   docker compose up -d
+#   docker compose logs -f
+#   docker compose down
+#
+# Requiere montar /var/run/docker.sock para gestionar stacks.
+# ═══════════════════════════════════════════════════════════════
+
+services:
+  dockpot:
+    image: ghcr.io/atareao/dockpot:latest
+    container_name: dockpot
+    restart: unless-stopped
+
+    ports:
+      - "3056:3056"
+
+    environment:
+      # ── OIDC Authentication ──────────────────────────────
+      OIDC_ISSUER_URL: "${OIDC_ISSUER_URL}"
+      OIDC_CLIENT_ID: "${OIDC_CLIENT_ID}"
+      OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET}"
+      OIDC_REDIRECT_URL: "${OIDC_REDIRECT_URL:-http://localhost:3056/auth/callback}"
+      OIDC_SCOPES: "${OIDC_SCOPES:-openid profile email}"
+
+      # ── JWT ──────────────────────────────────────────────
+      JWT_SECRET: "${JWT_SECRET}"
+
+      # ── Server ───────────────────────────────────────────
+      HOST: "${HOST:-0.0.0.0}"
+      PORT: "${PORT:-3056}"
+      DATABASE_URL: "${DATABASE_URL:-sqlite:///app/data/dockpot.db}"
+      DATA_DIR: "${DATA_DIR:-/app/data}"
+      STACKS_DIR: "${STACKS_DIR:-/app/stacks}"
+
+      # ── Docker ───────────────────────────────────────────
+      DOCKER_HOST: "${DOCKER_HOST:-unix:///var/run/docker.sock}"
+
+      # ── Logging ──────────────────────────────────────────
+      RUST_LOG: "${RUST_LOG:-info}"
+
+    volumes:
+      # Socket Docker para gestionar contenedores
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Datos persistentes (SQLite + stacks)
+      - dockpot_data:/app/data
+      - dockpot_stacks:/app/stacks
+
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3056/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  dockpot_data:
+  dockpot_stacks:

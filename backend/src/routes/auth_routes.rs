@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::extract::{Query, State};
@@ -5,7 +6,7 @@ use axum::response::Redirect;
 use axum::Json;
 use base64::Engine;
 use serde::Deserialize;
-use sha1::Digest;
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::auth::{AppState, Claims, OidcState};
@@ -27,7 +28,7 @@ pub async fn login(
     // Generate PKCE challenge
     let code_verifier = Uuid::new_v4().to_string() + &Uuid::new_v4().to_string();
     let code_challenge = {
-        let mut hasher = sha1::Sha1::new();
+        let mut hasher = Sha256::new();
         hasher.update(code_verifier.as_bytes());
         let result = hasher.finalize();
         base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(result)
@@ -42,7 +43,11 @@ pub async fn login(
         created_at: chrono::Utc::now(),
     };
 
-    state.oidc_states.lock().await.insert(state_value.clone(), oidc_state);
+    state
+        .oidc_states
+        .lock()
+        .await
+        .insert(state_value.clone(), oidc_state);
 
     let auth_url = format!(
         "{}?response_type=code&client_id={}&redirect_uri={}&scope=openid%20email%20profile&state={}&code_challenge={}&code_challenge_method=S256",
@@ -71,32 +76,35 @@ fn urlencoding(s: &str) -> String {
     url::form_urlencoded::byte_serialize(s.as_bytes()).collect()
 }
 
-#[derive(Deserialize)]
-pub struct CallbackQuery {
-    pub code: String,
-    pub state: String,
-}
-
-#[derive(Deserialize)]
-pub struct TokenResponse {
-    pub access_token: String,
-    pub id_token: Option<String>,
-    pub token_type: String,
-    pub expires_in: Option<i64>,
-}
-
 pub async fn callback(
     State(state): State<Arc<AppState>>,
-    Query(query): Query<CallbackQuery>,
+    Query(params): Query<HashMap<String, String>>,
 ) -> Result<axum::response::Response, String> {
-    let metadata = state
-        .oidc_metadata
-        .as_ref()
-        .ok_or("OIDC not configured")?;
+    let metadata = state.oidc_metadata.as_ref().ok_or("OIDC not configured")?;
+
+    // Check if OIDC provider returned an error
+    if let Some(error) = params.get("error") {
+        let desc = params
+            .get("error_description")
+            .map(|s| s.as_str())
+            .unwrap_or("Unknown error");
+        tracing::error!("OIDC callback error: {} - {}", error, desc);
+        return Err(format!(
+            "OIDC provider returned an error: {} ({})",
+            error, desc
+        ));
+    }
+
+    let code = params
+        .get("code")
+        .ok_or_else(|| "Missing authorization code in callback".to_string())?;
+    let state_param = params
+        .get("state")
+        .ok_or_else(|| "Missing state parameter".to_string())?;
 
     // Verify state
     let mut states = state.oidc_states.lock().await;
-    let (code_verifier, redirect_uri) = match states.remove(&query.state) {
+    let (code_verifier, redirect_uri) = match states.remove(state_param) {
         Some(s) => {
             let parts: Vec<&str> = s.state.splitn(2, ':').collect();
             let _orig_state = parts[0].to_string();
@@ -107,35 +115,61 @@ pub async fn callback(
     };
     drop(states);
 
-    // Exchange code for token
+    // Exchange code for token (client_secret_post — exactly like alloy)
     let client = reqwest::Client::new();
-    let params = [
+    let token_params = [
         ("grant_type", "authorization_code"),
-        ("code", &query.code),
+        ("code", code),
         ("redirect_uri", &state.config.oidc_redirect_url),
         ("client_id", &state.config.oidc_client_id),
         ("client_secret", &state.config.oidc_client_secret),
         ("code_verifier", &code_verifier),
     ];
 
-    let resp = client
+    let token_resp = client
         .post(&metadata.token_endpoint)
-        .form(&params)
+        .form(&token_params)
         .send()
         .await
         .map_err(|e| format!("Token request failed: {}", e))?;
 
-    let token_resp: TokenResponse = resp
+    let status = token_resp.status();
+    let token_body: serde_json::Value = token_resp
         .json()
         .await
-        .map_err(|e| format!("Token parse failed: {}", e))?;
+        .map_err(|e| format!("Invalid token response (HTTP {}): {}", status.as_u16(), e))?;
 
-    let id_token = token_resp.id_token.as_deref().unwrap_or(&token_resp.access_token);
+    // Check for OAuth2 error in response
+    if !status.is_success() {
+        let err = token_body["error"].as_str().unwrap_or("unknown");
+        let desc = token_body["error_description"]
+            .as_str()
+            .unwrap_or("no description");
+        tracing::error!(
+            "Token endpoint error ({}): {} - {}",
+            status.as_u16(),
+            err,
+            desc
+        );
+        return Err(format!("Token endpoint returned error: {} ({})", err, desc));
+    }
 
-    // Set cookie and redirect
+    // Extract access_token (exactly like alloy)
+    let access_token = token_body["access_token"]
+        .as_str()
+        .ok_or_else(|| "No access_token in token response".to_string())?;
+
+    // Validate token against JWKS (exactly like alloy)
+    let _jwt_claims = state
+        .jwt_validator
+        .validate_token(access_token)
+        .await
+        .map_err(|e| format!("Token validation failed: {}", e))?;
+
+    // Set cookie and redirect (exactly like alloy)
     let cookie = format!(
         "token={}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400",
-        id_token
+        access_token
     );
 
     let target = if redirect_uri.is_empty() {

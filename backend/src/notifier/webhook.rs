@@ -1,10 +1,6 @@
 use reqwest::Client;
 
-pub async fn send(
-    url: &str,
-    title: &str,
-    message: &str,
-) -> Result<(), String> {
+pub async fn send(url: &str, title: &str, message: &str) -> Result<(), String> {
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()

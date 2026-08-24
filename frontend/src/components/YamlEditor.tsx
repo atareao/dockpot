@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import { useRef } from 'react';
 import Editor, { OnMount, OnChange } from '@monaco-editor/react';
 import { Spin } from 'antd';
 
@@ -18,7 +18,6 @@ export function YamlEditor({
   onValidate,
 }: YamlEditorProps) {
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
-  const [mounted, setMounted] = useState(false);
 
   const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -45,8 +44,6 @@ export function YamlEditor({
         onValidate?.(errors.length === 0, errors);
       });
     });
-
-    setMounted(true);
   };
 
   const handleChange: OnChange = (val) => {

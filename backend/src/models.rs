@@ -376,9 +376,14 @@ mod tests {
     #[test]
     fn test_stack_default_status() {
         let row = StackRow {
-            id: "x".into(), name: "x".into(), description: None,
-            compose: String::new(), status: "stopped".into(),
-            path: "/tmp".into(), created_at: String::new(), updated_at: String::new(),
+            id: "x".into(),
+            name: "x".into(),
+            description: None,
+            compose: String::new(),
+            status: "stopped".into(),
+            path: "/tmp".into(),
+            created_at: String::new(),
+            updated_at: String::new(),
         };
         let stack: Stack = row.into();
         assert_eq!(stack.status, "stopped");
@@ -407,9 +412,13 @@ mod tests {
     #[test]
     fn test_sync_default_branch() {
         let row = StackSyncRow {
-            stack_id: "s2".into(), sync_type: "git_dir".into(),
-            remote_url: None, remote_branch: "main".into(),
-            auth_token: None, last_commit: None, last_synced_at: None,
+            stack_id: "s2".into(),
+            sync_type: "git_dir".into(),
+            remote_url: None,
+            remote_branch: "main".into(),
+            auth_token: None,
+            last_commit: None,
+            last_synced_at: None,
             status: "idle".into(),
         };
         let sync: StackSync = row.into();
@@ -422,10 +431,13 @@ mod tests {
     #[test]
     fn test_notifier_from_row() {
         let row = NotifierRow {
-            id: "n1".into(), name: "Telegram Alerts".into(),
+            id: "n1".into(),
+            name: "Telegram Alerts".into(),
             notifier_type: "telegram".into(),
             config_json: r#"{"bot_token":"xxx"}"#.into(),
-            enabled: 1, created_at: String::new(), updated_at: String::new(),
+            enabled: 1,
+            created_at: String::new(),
+            updated_at: String::new(),
         };
         let n: Notifier = row.into();
         assert_eq!(n.name, "Telegram Alerts");
@@ -436,9 +448,13 @@ mod tests {
     #[test]
     fn test_notifier_disabled() {
         let row = NotifierRow {
-            id: "n2".into(), name: "Disabled".into(),
-            notifier_type: "ntfy".into(), config_json: "{}".into(),
-            enabled: 0, created_at: String::new(), updated_at: String::new(),
+            id: "n2".into(),
+            name: "Disabled".into(),
+            notifier_type: "ntfy".into(),
+            config_json: "{}".into(),
+            enabled: 0,
+            created_at: String::new(),
+            updated_at: String::new(),
         };
         let n: Notifier = row.into();
         assert!(!n.enabled);
@@ -447,9 +463,13 @@ mod tests {
     #[test]
     fn test_notifier_default_config() {
         let row = NotifierRow {
-            id: "n3".into(), name: "Empty".into(),
-            notifier_type: "webhook".into(), config_json: "not-json".into(),
-            enabled: 1, created_at: String::new(), updated_at: String::new(),
+            id: "n3".into(),
+            name: "Empty".into(),
+            notifier_type: "webhook".into(),
+            config_json: "not-json".into(),
+            enabled: 1,
+            created_at: String::new(),
+            updated_at: String::new(),
         };
         let n: Notifier = row.into();
         // Falls back to Null on invalid JSON
@@ -461,12 +481,19 @@ mod tests {
     #[test]
     fn test_agent_from_row() {
         let row = AgentRow {
-            id: "a1".into(), name: "docker-01".into(),
-            agent_type: "docker".into(), host: "192.168.1.100".into(),
-            port: 2376, tls_enabled: 1,
-            ca_cert: Some("cert".into()), client_cert: None, client_key: None,
-            description: Some("Main host".into()), enabled: 1,
-            created_at: String::new(), updated_at: String::new(),
+            id: "a1".into(),
+            name: "docker-01".into(),
+            agent_type: "docker".into(),
+            host: "192.168.1.100".into(),
+            port: 2376,
+            tls_enabled: 1,
+            ca_cert: Some("cert".into()),
+            client_cert: None,
+            client_key: None,
+            description: Some("Main host".into()),
+            enabled: 1,
+            created_at: String::new(),
+            updated_at: String::new(),
         };
         let a: Agent = row.into();
         assert_eq!(a.name, "docker-01");
@@ -479,12 +506,19 @@ mod tests {
     #[test]
     fn test_agent_disabled() {
         let row = AgentRow {
-            id: "a2".into(), name: "offline".into(),
-            agent_type: "docker".into(), host: "10.0.0.1".into(),
-            port: 2375, tls_enabled: 0,
-            ca_cert: None, client_cert: None, client_key: None,
-            description: None, enabled: 0,
-            created_at: String::new(), updated_at: String::new(),
+            id: "a2".into(),
+            name: "offline".into(),
+            agent_type: "docker".into(),
+            host: "10.0.0.1".into(),
+            port: 2375,
+            tls_enabled: 0,
+            ca_cert: None,
+            client_cert: None,
+            client_key: None,
+            description: None,
+            enabled: 0,
+            created_at: String::new(),
+            updated_at: String::new(),
         };
         let a: Agent = row.into();
         assert!(!a.enabled);
@@ -496,9 +530,13 @@ mod tests {
     #[test]
     fn test_dashboard_status_serialize() {
         let ds = DashboardStatus {
-            total_stacks: 5, running_stacks: 3, stopped_stacks: 2,
-            error_stacks: 0, docker_version: Some("24.0.7".into()),
-            docker_containers: 10, docker_images: 25,
+            total_stacks: 5,
+            running_stacks: 3,
+            stopped_stacks: 2,
+            error_stacks: 0,
+            docker_version: Some("24.0.7".into()),
+            docker_containers: 10,
+            docker_images: 25,
             recent_activity: vec![],
         };
         let json = serde_json::to_string(&ds).unwrap();
@@ -511,9 +549,12 @@ mod tests {
     #[test]
     fn test_env_file_from_row() {
         let row = EnvFileRow {
-            id: "e1".into(), stack_id: "s1".into(),
-            filename: ".env".into(), content: "DB_HOST=localhost".into(),
-            created_at: String::new(), updated_at: String::new(),
+            id: "e1".into(),
+            stack_id: "s1".into(),
+            filename: ".env".into(),
+            content: "DB_HOST=localhost".into(),
+            created_at: String::new(),
+            updated_at: String::new(),
         };
         let env: EnvFile = row.into();
         assert_eq!(env.filename, ".env");

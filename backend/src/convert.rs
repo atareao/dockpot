@@ -11,7 +11,9 @@ pub fn docker_run_to_compose(cmd: &str, service_name: &str) -> Result<String, St
     }
 
     // Find "run" position
-    let run_pos = args.iter().position(|a| a == "run")
+    let run_pos = args
+        .iter()
+        .position(|a| a == "run")
         .ok_or_else(|| "Not a docker run command (missing 'run')".to_string())?;
 
     let docker_args = &args[run_pos + 1..];
@@ -158,7 +160,8 @@ pub fn docker_run_to_compose(cmd: &str, service_name: &str) -> Result<String, St
                 }
                 continue;
             }
-            "--cap-add" | "--cap-drop" | "--privileged" | "--security-opt" | "--shm-size" | "--tmpfs" => {
+            "--cap-add" | "--cap-drop" | "--privileged" | "--security-opt" | "--shm-size"
+            | "--tmpfs" => {
                 // Pass through: skip value args
                 if arg == "--privileged" {
                     service.privileged = true;
@@ -249,7 +252,9 @@ fn parse_memory_mb(s: &str) -> Result<u64, String> {
         s.find(|c: char| !c.is_ascii_digit() && c != '.')
             .unwrap_or(s.len()),
     );
-    let num: f64 = num_str.parse().map_err(|_| format!("Invalid memory value: {}", s))?;
+    let num: f64 = num_str
+        .parse()
+        .map_err(|_| format!("Invalid memory value: {}", s))?;
 
     if s.ends_with('g') || s.ends_with("gb") {
         Ok((num * 1024.0) as u64)
@@ -435,7 +440,8 @@ mod tests {
         let result = docker_run_to_compose(
             "docker run -d --name myapp -p 8080:80 nginx:alpine",
             "myapp",
-        ).unwrap();
+        )
+        .unwrap();
         assert!(result.contains("image: nginx:alpine"));
         assert!(result.contains("container_name: myapp"));
         assert!(result.contains("ports:"));
@@ -447,7 +453,8 @@ mod tests {
         let result = docker_run_to_compose(
             "docker run -d -v /data:/data -e DB_HOST=localhost -e DB_PORT=5432 postgres:15",
             "db",
-        ).unwrap();
+        )
+        .unwrap();
         assert!(result.contains("image: postgres:15"));
         assert!(result.contains("- /data:/data"));
         assert!(result.contains("DB_HOST: localhost"));
