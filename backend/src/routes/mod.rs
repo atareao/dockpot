@@ -1,5 +1,5 @@
 use axum::extract::State;
-use axum::routing;
+use axum::routing::{self, MethodRouter};
 use axum::Router;
 
 use crate::auth;
@@ -29,16 +29,27 @@ pub fn api_routes() -> Router<AppState> {
             "/api/stacks",
             routing::get(stacks::list).post(stacks::create),
         )
+        .route("/api/stacks/discover", routing::get(stacks::discover))
+        .route("/api/stacks/import", routing::post(stacks::import))
+        .route(
+            "/api/stacks/create-from-container",
+            routing::post(stacks::create_from_container),
+        )
         .route(
             "/api/stacks/{id}",
-            routing::get(stacks::get).delete(stacks::delete),
+            MethodRouter::new()
+                .get(stacks::get)
+                .put(stacks::update)
+                .delete(stacks::delete),
         )
         .route("/api/stacks/{id}/start", routing::post(stacks::start))
         .route("/api/stacks/{id}/stop", routing::post(stacks::stop))
         .route("/api/stacks/{id}/restart", routing::post(stacks::restart))
         .route(
             "/api/stacks/{id}/compose",
-            routing::get(stacks::get_compose),
+            MethodRouter::new()
+                .get(stacks::get_compose)
+                .put(stacks::update_compose),
         )
         .route(
             "/api/stacks/validate",
@@ -55,10 +66,13 @@ pub fn api_routes() -> Router<AppState> {
         .route("/api/status", routing::get(stacks::list))
         .route("/api/docker/info", routing::get(docker_info::docker_info))
         // Env files
-        .route("/api/stacks/{id}/env", routing::get(env::list))
+        .route(
+            "/api/stacks/{id}/env",
+            MethodRouter::new().get(env::list).put(env::upsert),
+        )
         .route(
             "/api/stacks/{id}/env/{filename}",
-            routing::delete(env::list),
+            MethodRouter::new().delete(env::delete),
         )
         // Notifiers
         .route(

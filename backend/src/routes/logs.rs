@@ -11,22 +11,39 @@ use tokio_stream::wrappers::ReceiverStream;
 use crate::db::Database;
 use crate::models::AppError;
 
+/// Resolve the actual running container names for a compose project
+/// by parsing `docker compose ps --format '{{.Name}}'` output.
+async fn resolve_compose_containers(stack_path: &str) -> Vec<String> {
+    let compose_path = format!("{stack_path}/compose.yaml");
+    let output = tokio::process::Command::new("docker")
+        .args([
+            "compose",
+            "-f",
+            &compose_path,
+            "ps",
+            "--format",
+            "{{.Name}}",
+        ])
+        .output()
+        .await;
+    match output {
+        Ok(out) if out.status.success() => {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            stdout
+                .lines()
+                .map(|l| l.trim().to_string())
+                .filter(|l| !l.is_empty())
+                .collect()
+        }
+        _ => vec![],
+    }
+}
+
 /// SSE handler for streaming Docker container logs of a stack.
 ///
-/// The `id` path parameter is a **stack ID** (UUID). The handler looks up
-/// the stack in the database, resolves its name, and uses that name as the
-/// Docker container name for `docker.logs()`.
-///
-/// # Current limitation (temporal adaptation)
-///
-/// Bollard requires a specific container name, not a compose project name.
-/// For stacks deployed via Docker Compose, containers are typically named
-/// `{project}_{service}_{N}`.  This handler currently uses **the stack name
-/// directly** as the container name, which only works when the stack name
-/// happens to match a running container (e.g. single-service stacks).
-///
-/// Future work: resolve all containers belonging to a compose project and
-/// multiplex their log streams into a single SSE connection.
+/// Resolves the actual container names from the compose project (via
+/// `docker compose ps`) and streams logs from all of them multiplexed
+/// into a single SSE connection.
 pub async fn logs_sse_handler(
     State(docker): State<Docker>,
     State(db): State<Database>,
@@ -39,11 +56,23 @@ pub async fn logs_sse_handler(
         .map_err(|e| AppError::Internal(format!("Database error looking up stack: {e}")))?
         .ok_or_else(|| AppError::NotFound(format!("Stack '{id}' not found")))?;
 
-    // ── Configure Bollard log stream ─────────────────────────────────
-    //
-    // NOTE: The stack name is used as the container name.  This works for
-    // stacks that match a running container name directly.  Compose-project
-    // multiplexing will be added in a future iteration.
+    // ── Resolve container names from compose project ─────────────────
+    let container_names = resolve_compose_containers(&stack.path).await;
+
+    if container_names.is_empty() {
+        return Err(AppError::NotFound(format!(
+            "No running containers found for stack '{}'",
+            stack.name
+        )));
+    }
+
+    tracing::debug!(
+        "Streaming logs for '{}' from containers: {:?}",
+        stack.name,
+        container_names
+    );
+
+    // ── Configure Bollard log stream options ─────────────────────────
     let options = LogsOptions::<String> {
         follow: true,
         stdout: true,
@@ -52,39 +81,44 @@ pub async fn logs_sse_handler(
         ..Default::default()
     };
 
-    let stream = docker.logs(&stack.name, Some(options));
-    let mut stream = Box::pin(stream);
-
     // ── Bridge Bollard stream → SSE channel ─────────────────────────
     let (tx, rx) = mpsc::channel::<Result<Event, Infallible>>(100);
 
     tokio::spawn(async move {
-        while let Some(item) = stream.next().await {
-            match item {
-                Ok(LogOutput::StdOut { message }) | Ok(LogOutput::StdErr { message }) => {
-                    let text = String::from_utf8_lossy(&message).to_string();
-                    if tx
-                        .send(Ok(Event::default().event("log").data(text)))
-                        .await
-                        .is_err()
-                    {
-                        // Receiver dropped (client disconnected)
-                        break;
+        // Stream logs from ALL containers, multiplexed
+        for container_name in &container_names {
+            let tx = tx.clone();
+            let name = container_name.clone();
+            let opts = options.clone();
+            let d = docker.clone();
+
+            tokio::spawn(async move {
+                let mut stream = Box::pin(d.logs(&name, Some(opts)));
+                while let Some(item) = stream.next().await {
+                    match item {
+                        Ok(LogOutput::StdOut { message }) | Ok(LogOutput::StdErr { message }) => {
+                            let text = String::from_utf8_lossy(&message).to_string();
+                            let prefixed = format!("[{name}] {text}");
+                            if tx
+                                .send(Ok(Event::default().event("log").data(prefixed)))
+                                .await
+                                .is_err()
+                            {
+                                break;
+                            }
+                        }
+                        Ok(_) => continue,
+                        Err(e) => {
+                            let _ = tx
+                                .send(Ok(Event::default()
+                                    .event("error")
+                                    .data(format!("[{name}] Docker error: {e}"))))
+                                .await;
+                            break;
+                        }
                     }
                 }
-                Ok(_) => {
-                    // Other log output types (e.g. console) — skip
-                    continue;
-                }
-                Err(e) => {
-                    let _ = tx
-                        .send(Ok(Event::default()
-                            .event("error")
-                            .data(format!("Docker error: {e}"))))
-                        .await;
-                    break;
-                }
-            }
+            });
         }
     });
 

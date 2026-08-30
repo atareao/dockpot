@@ -119,6 +119,8 @@ pub async fn state_worker(
     ];
 
     let mut previous_states: HashMap<String, String> = HashMap::new();
+    let mut consecutive_errors: u32 = 0;
+    const MAX_CONSECUTIVE_ERRORS: u32 = 5;
 
     refresh(
         &docker,
@@ -131,6 +133,25 @@ pub async fn state_worker(
     .await;
 
     loop {
+        // ── After too many consecutive failures, fall back to polling only ──
+        if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+            tracing::warn!(
+                "Docker events unavailable after {MAX_CONSECUTIVE_ERRORS} attempts — switching to polling-only mode"
+            );
+            loop {
+                tokio::time::sleep(Duration::from_secs(30)).await;
+                refresh(
+                    &docker,
+                    &db,
+                    &tx,
+                    &cached_containers,
+                    &notif_tx,
+                    &mut previous_states,
+                )
+                .await;
+            }
+        }
+
         let options = EventsOptions::<String> {
             since: None,
             until: None,
@@ -145,6 +166,7 @@ pub async fn state_worker(
                 event = stream.next() => {
                     match event {
                         Some(Ok(evt)) => {
+                            consecutive_errors = 0;
                             if evt.typ == Some(bollard::models::EventMessageTypeEnum::CONTAINER) {
                                 if let Some(ref action) = evt.action {
                                     if relevant_actions.contains(&action.as_str()) {
@@ -154,11 +176,19 @@ pub async fn state_worker(
                             }
                         }
                         Some(Err(e)) => {
-                            tracing::warn!("Docker events stream error: {} — reconnecting", e);
+                            consecutive_errors += 1;
+                            let backoff = Duration::from_secs(consecutive_errors.min(10) as u64);
+                            tracing::warn!(
+                                "Docker events stream error (attempt {}/{}): {} — retrying in {}s",
+                                consecutive_errors, MAX_CONSECUTIVE_ERRORS, e, backoff.as_secs()
+                            );
+                            tokio::time::sleep(backoff).await;
                             break;
                         }
                         None => {
                             tracing::warn!("Docker events stream ended — reconnecting");
+                            consecutive_errors = 0;
+                            tokio::time::sleep(Duration::from_secs(1)).await;
                             break;
                         }
                     }
@@ -168,6 +198,5 @@ pub async fn state_worker(
                 }
             }
         }
-        tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }

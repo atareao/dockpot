@@ -174,12 +174,15 @@ impl Database {
         compose: &str,
     ) -> Result<bool> {
         let now = Utc::now().to_rfc3339();
-        let obj = self.pool.get().await?;
-        let conn = obj.lock().unwrap();
-        let rows = conn.execute(
-            "UPDATE stacks SET name=?1, description=?2, compose=?3, updated_at=?4 WHERE id=?5",
-            rusqlite::params![name, description, compose, now, id],
-        )?;
+
+        let rows = {
+            let obj = self.pool.get().await?;
+            let conn = obj.lock().unwrap();
+            conn.execute(
+                "UPDATE stacks SET name=?1, description=?2, compose=?3, updated_at=?4 WHERE id=?5",
+                rusqlite::params![name, description, compose, now, id],
+            )?
+        };
 
         if let Ok(Some(stack)) = self.get_stack(id).await {
             let compose_path = Path::new(&stack.path).join("compose.yaml");
@@ -340,15 +343,18 @@ impl Database {
     ) -> Result<EnvFile> {
         let now = Utc::now().to_rfc3339();
         let id = Uuid::new_v4().to_string();
-        let obj = self.pool.get().await?;
-        let conn = obj.lock().unwrap();
-        conn.execute(
-            "INSERT INTO env_files (id, stack_id, filename, content, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
-             ON CONFLICT(stack_id, filename) DO UPDATE SET \
-             content=excluded.content, updated_at=excluded.updated_at",
-            rusqlite::params![id, stack_id, filename, content, now, now],
-        )?;
+
+        {
+            let obj = self.pool.get().await?;
+            let conn = obj.lock().unwrap();
+            conn.execute(
+                "INSERT INTO env_files (id, stack_id, filename, content, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
+                 ON CONFLICT(stack_id, filename) DO UPDATE SET \
+                 content=excluded.content, updated_at=excluded.updated_at",
+                rusqlite::params![id, stack_id, filename, content, now, now],
+            )?;
+        }
 
         // Write to disk too
         if let Ok(Some(stack)) = self.get_stack(stack_id).await {
@@ -367,12 +373,14 @@ impl Database {
     }
 
     pub async fn delete_env_file(&self, stack_id: &str, filename: &str) -> Result<bool> {
-        let obj = self.pool.get().await?;
-        let conn = obj.lock().unwrap();
-        let rows = conn.execute(
-            "DELETE FROM env_files WHERE stack_id=?1 AND filename=?2",
-            rusqlite::params![stack_id, filename],
-        )?;
+        let rows = {
+            let obj = self.pool.get().await?;
+            let conn = obj.lock().unwrap();
+            conn.execute(
+                "DELETE FROM env_files WHERE stack_id=?1 AND filename=?2",
+                rusqlite::params![stack_id, filename],
+            )?
+        };
         if let Ok(Some(stack)) = self.get_stack(stack_id).await {
             let env_path = Path::new(&stack.path).join(filename);
             let _ = tokio::fs::remove_file(&env_path).await;

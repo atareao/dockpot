@@ -1,6 +1,7 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::git;
@@ -29,6 +30,370 @@ async fn auto_commit(state: &AppState, id: &str, message: &str) {
             }
         }
     }
+}
+
+/// Raw project from `docker compose ls --format json`
+#[allow(non_snake_case)]
+#[derive(Deserialize)]
+struct ComposeProject {
+    Name: String,
+    Status: String,
+    ConfigFiles: String,
+}
+
+/// Body for the import endpoint
+#[derive(Deserialize)]
+pub struct ImportStackRequest {
+    pub name: String,
+}
+
+/// Run `docker compose ls --format json` and return the parsed projects.
+async fn discover_projects() -> Result<Vec<ComposeProject>, String> {
+    let output = tokio::process::Command::new("docker")
+        .args(["compose", "ls", "--format", "json"])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run docker compose ls: {e}"))?;
+
+    if !output.status.success() {
+        return Ok(vec![]);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    serde_json::from_str::<Vec<ComposeProject>>(&stdout)
+        .map_err(|e| format!("Failed to parse compose ls output: {e}"))
+}
+
+pub async fn discover(State(state): State<AppState>) -> Result<Json<Value>, (StatusCode, String)> {
+    let projects = discover_projects().await.map_err(|e| {
+        tracing::error!("Failed to discover projects: {}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
+
+    let _managed_stacks = state.db.list_stacks().await.map_err(|e| {
+        tracing::error!("Failed to list stacks: {}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
+
+    let mut results = Vec::new();
+    for project in &projects {
+        let managed = project.ConfigFiles.contains("/app/stacks/");
+        let compose = if managed {
+            None
+        } else {
+            // Try reading the file directly first, fall back to `docker compose config`
+            match tokio::fs::read_to_string(&project.ConfigFiles).await {
+                Ok(c) => Some(c),
+                Err(_) => {
+                    // File not directly accessible (e.g. host path) — use docker compose config
+                    let config_path = project.ConfigFiles.trim();
+                    let output = tokio::process::Command::new("docker")
+                        .args(["compose", "-f", config_path, "config"])
+                        .output()
+                        .await
+                        .ok();
+                    output.and_then(|o| {
+                        if o.status.success() {
+                            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                            if s.is_empty() {
+                                None
+                            } else {
+                                Some(s)
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                }
+            }
+        };
+
+        results.push(serde_json::json!({
+            "name": project.Name,
+            "status": project.Status,
+            "config_files": project.ConfigFiles,
+            "compose": compose,
+            "managed": managed,
+        }));
+    }
+
+    // ── Standalone containers (docker run, no compose) ──
+    let container_output = tokio::process::Command::new("docker")
+        .args([
+            "container",
+            "ls",
+            "--format",
+            "{{.ID}}\t{{.Image}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Labels}}",
+        ])
+        .output()
+        .await
+        .ok();
+
+    if let Some(out) = container_output {
+        if out.status.success() {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            for line in stdout.lines() {
+                let parts: Vec<&str> = line.split('\t').collect();
+                if parts.len() < 6 {
+                    continue;
+                }
+                let cid = parts[0];
+                let image = parts[1];
+                let cname = parts[2];
+                let status = parts[3];
+                let ports = parts[4];
+                let labels = parts[5];
+
+                // Skip if part of a compose project (has com.docker.compose.project label)
+                if labels.contains("com.docker.compose.project") {
+                    continue;
+                }
+
+                results.push(serde_json::json!({
+                    "name": cname,
+                    "status": status,
+                    "image": image,
+                    "ports": ports,
+                    "container_id": cid,
+                    "type": "container",
+                    "managed": false,
+                }));
+            }
+        }
+    }
+
+    Ok(Json(serde_json::json!(results)))
+}
+
+/// Body for create-from-container endpoint
+#[derive(Deserialize)]
+pub struct CreateFromContainerRequest {
+    pub container_name: String,
+}
+
+/// Create a compose stack from a running standalone container
+pub async fn create_from_container(
+    State(state): State<AppState>,
+    Json(req): Json<CreateFromContainerRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let name = req.container_name.trim().to_string();
+    if name.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "container_name is required".into()));
+    }
+
+    // Inspect the container
+    let output = tokio::process::Command::new("docker")
+        .args(["container", "inspect", &name])
+        .output()
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to inspect container: {e}"),
+            )
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err((
+            StatusCode::NOT_FOUND,
+            format!("Container '{}' not found: {stderr}", name),
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let inspect: Value = serde_json::from_str(&stdout).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to parse inspect: {e}"),
+        )
+    })?;
+
+    let cfg = &inspect[0]["Config"];
+    let host = &inspect[0]["HostConfig"];
+    let image = cfg["Image"].as_str().unwrap_or("unknown");
+
+    // Build compose YAML
+    let mut compose = format!("services:\n  {}:\n    image: {}\n", name, image);
+
+    // Ports
+    let mut port_lines: Vec<String> = Vec::new();
+    if let Some(ports) = host["PortBindings"].as_object() {
+        for (container_port, bindings) in ports {
+            if let Some(arr) = bindings.as_array() {
+                for b in arr {
+                    let host_port = b["HostPort"].as_str().unwrap_or("");
+                    let host_ip = b["HostIp"].as_str().unwrap_or("");
+                    let cp = container_port
+                        .trim_end_matches("/tcp")
+                        .trim_end_matches("/udp");
+                    if host_ip.is_empty() {
+                        port_lines.push(format!("      - \"{}:{}\"", host_port, cp));
+                    } else {
+                        port_lines.push(format!("      - \"{}:{}:{}\"", host_ip, host_port, cp));
+                    }
+                }
+            }
+        }
+    } else {
+        // Fallback to exposed ports
+        if let Some(exposed) = cfg["ExposedPorts"].as_object() {
+            for ep in exposed.keys() {
+                port_lines.push(format!("      - \"{}\"", ep));
+            }
+        }
+    }
+    if !port_lines.is_empty() {
+        compose.push_str("    ports:\n");
+        for l in &port_lines {
+            compose.push_str(l);
+            compose.push('\n');
+        }
+    }
+
+    // Volumes
+    let mut vol_lines: Vec<String> = Vec::new();
+    if let Some(mounts) = inspect[0]["Mounts"].as_array() {
+        for m in mounts {
+            let src = m["Source"].as_str().unwrap_or("");
+            let dst = m["Destination"].as_str().unwrap_or("");
+            let mode = m["Mode"].as_str().unwrap_or("rw");
+            if !src.is_empty() && !dst.is_empty() {
+                vol_lines.push(format!("      - \"{}:{}:{}\"", src, dst, mode));
+            }
+        }
+    }
+    if !vol_lines.is_empty() {
+        compose.push_str("    volumes:\n");
+        for l in &vol_lines {
+            compose.push_str(l);
+            compose.push('\n');
+        }
+    }
+
+    // Environment
+    let mut env_lines: Vec<String> = Vec::new();
+    if let Some(env) = cfg["Env"].as_array() {
+        for e in env {
+            if let Some(s) = e.as_str() {
+                env_lines.push(format!("      - {}", s));
+            }
+        }
+    }
+    if !env_lines.is_empty() {
+        compose.push_str("    environment:\n");
+        for l in &env_lines {
+            compose.push_str(l);
+            compose.push('\n');
+        }
+    }
+
+    compose.push_str("    restart: unless-stopped\n");
+
+    // Check name uniqueness
+    if let Ok(Some(_)) = state.db.get_stack_by_name(&name).await {
+        return Err((
+            StatusCode::CONFLICT,
+            format!("Stack '{}' already exists", name),
+        ));
+    }
+
+    let stack = state
+        .db
+        .create_stack(&name, None, &compose)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to create stack from container: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
+
+    tracing::info!(
+        "📦 Stack '{}' created from container '{}'",
+        stack.name,
+        name
+    );
+
+    auto_commit(
+        &state,
+        &stack.id,
+        &format!("dockpot: create stack '{}' from container", stack.name),
+    )
+    .await;
+
+    Ok(Json(serde_json::json!(stack)))
+}
+
+pub async fn import(
+    State(state): State<AppState>,
+    Json(req): Json<ImportStackRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let name = req.name.trim().to_string();
+    if name.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "Name is required".into()));
+    }
+
+    let projects = discover_projects().await.map_err(|e| {
+        tracing::error!("Failed to discover projects: {}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
+
+    let project = projects.iter().find(|p| p.Name == name).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Project '{}' not found in active compose projects", name),
+        )
+    })?;
+
+    let compose = match tokio::fs::read_to_string(&project.ConfigFiles).await {
+        Ok(c) => c,
+        Err(_) => {
+            // File not accessible (host path) — use docker compose config
+            let config_path = project.ConfigFiles.trim();
+            let output = tokio::process::Command::new("docker")
+                .args(["compose", "-f", config_path, "config"])
+                .output()
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to run docker compose config: {e}");
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Failed to read compose file: {e}"),
+                    )
+                })?;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to read compose file: {stderr}"),
+                ));
+            }
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        }
+    };
+
+    let stack = state
+        .db
+        .create_stack(&name, None, &compose)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to create stack: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
+
+    tracing::info!(
+        "📥 Stack '{}' imported from {}",
+        stack.name,
+        project.ConfigFiles
+    );
+
+    auto_commit(
+        &state,
+        &stack.id,
+        &format!("dockpot: import stack '{}'", stack.name),
+    )
+    .await;
+
+    Ok(Json(serde_json::json!(stack)))
 }
 
 pub async fn list(State(state): State<AppState>) -> Result<Json<Value>, (StatusCode, String)> {
