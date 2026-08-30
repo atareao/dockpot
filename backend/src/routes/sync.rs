@@ -1,17 +1,16 @@
 use std::path::Path as FilePath;
-use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde_json::Value;
 
-use crate::auth::AppState;
 use crate::git;
 use crate::models::{StackSync, SyncConfigRequest};
+use crate::state::AppState;
 
 pub async fn get_config(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let sync = state.db.get_sync_config(&id).await.map_err(|e| {
@@ -23,7 +22,7 @@ pub async fn get_config(
 }
 
 pub async fn set_config(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
     Json(req): Json<SyncConfigRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
@@ -99,7 +98,7 @@ pub async fn set_config(
 }
 
 pub async fn pull(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let stack = state
@@ -156,7 +155,7 @@ pub async fn pull(
 }
 
 pub async fn push(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let stack = state
@@ -225,7 +224,7 @@ pub async fn push(
 }
 
 pub async fn diff(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let stack = state
@@ -256,7 +255,7 @@ pub async fn diff(
 }
 
 pub async fn status(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let stack = state

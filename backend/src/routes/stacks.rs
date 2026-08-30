@@ -1,16 +1,14 @@
-use std::sync::Arc;
-
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde_json::Value;
 
-use crate::auth::AppState;
 use crate::git;
 use crate::models::{CreateStackRequest, UpdateStackRequest};
+use crate::state::AppState;
 
 /// Auto-commit changes if the stack has git sync enabled
-async fn auto_commit(state: &Arc<AppState>, id: &str, message: &str) {
+async fn auto_commit(state: &AppState, id: &str, message: &str) {
     if let Ok(Some(sync)) = state.db.get_sync_config(id).await {
         if sync.sync_type != "none" {
             if let Ok(Some(stack)) = state.db.get_stack(id).await {
@@ -33,7 +31,7 @@ async fn auto_commit(state: &Arc<AppState>, id: &str, message: &str) {
     }
 }
 
-pub async fn list(State(state): State<Arc<AppState>>) -> Result<Json<Value>, (StatusCode, String)> {
+pub async fn list(State(state): State<AppState>) -> Result<Json<Value>, (StatusCode, String)> {
     let stacks = state.db.list_stacks().await.map_err(|e| {
         tracing::error!("Failed to list stacks: {}", e);
         (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
@@ -43,7 +41,7 @@ pub async fn list(State(state): State<Arc<AppState>>) -> Result<Json<Value>, (St
 }
 
 pub async fn create(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Json(req): Json<CreateStackRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     if req.name.trim().is_empty() {
@@ -82,7 +80,7 @@ pub async fn create(
 }
 
 pub async fn get(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let stack = state
@@ -99,7 +97,7 @@ pub async fn get(
 }
 
 pub async fn update(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
     Json(req): Json<UpdateStackRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
@@ -143,7 +141,7 @@ pub async fn update(
 }
 
 pub async fn delete(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let deleted = state.db.delete_stack(&id).await.map_err(|e| {
@@ -159,7 +157,7 @@ pub async fn delete(
 }
 
 pub async fn start(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let stack = state
@@ -227,7 +225,7 @@ pub async fn start(
 }
 
 pub async fn stop(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let stack = state
@@ -299,7 +297,7 @@ pub async fn stop(
 }
 
 pub async fn restart(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let stack = state
@@ -343,7 +341,7 @@ pub async fn restart(
 }
 
 pub async fn get_compose(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let stack = state
@@ -364,7 +362,7 @@ pub async fn get_compose(
 }
 
 pub async fn update_compose(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
     Json(req): Json<serde_json::Value>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
@@ -406,7 +404,7 @@ pub async fn update_compose(
 }
 
 pub async fn validate_compose(
-    State(_state): State<Arc<AppState>>,
+    State(_state): State<AppState>,
     Json(req): Json<serde_json::Value>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let compose = req
@@ -423,7 +421,7 @@ pub async fn validate_compose(
 }
 
 pub async fn pull(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let stack = state
@@ -463,7 +461,7 @@ pub async fn pull(
 }
 
 pub async fn dashboard_status(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let status = state.db.get_dashboard_status().await.map_err(|e| {
         tracing::error!("Failed to get dashboard status: {}", e);

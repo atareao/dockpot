@@ -1,14 +1,12 @@
-use std::sync::Arc;
-
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde_json::Value;
 
-use crate::auth::AppState;
+use crate::state::AppState;
 
 pub async fn stats(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(stack_id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let stats = state

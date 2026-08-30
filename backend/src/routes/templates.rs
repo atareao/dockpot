@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -7,18 +6,18 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::auth::AppState;
+use crate::state::AppState;
 use crate::templates;
 
 pub async fn list_templates(
-    State(_state): State<Arc<AppState>>,
+    State(_state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let templates = templates::get_templates();
     Ok(Json(serde_json::json!(templates)))
 }
 
 pub async fn get_template(
-    State(_state): State<Arc<AppState>>,
+    State(_state): State<AppState>,
     Path(name): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let templates = templates::get_templates();
@@ -42,7 +41,7 @@ pub struct RenderRequest {
 }
 
 pub async fn render_template(
-    State(_state): State<Arc<AppState>>,
+    State(_state): State<AppState>,
     Json(req): Json<RenderRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let templates = templates::get_templates();

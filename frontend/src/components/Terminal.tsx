@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Button, Space, Tag } from 'antd';
 import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
+import { connectSSE } from '../api/http';
 
 interface TerminalProps { stackId: string; stackName: string; height?: string | number; }
 
@@ -37,21 +38,40 @@ function colorizeLine(line: string): React.ReactNode {
 export function Terminal({ stackId, stackName, height = 400 }: TerminalProps) {
   const [connected, setConnected] = useState(false);
   const [lines, setLines] = useState<string[]>([]);
-  const wsRef = useRef<WebSocket | null>(null);
+  const esRef = useRef<EventSource | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lineBuffer = useRef<string[]>([]);
 
   const connect = useCallback(() => {
-    wsRef.current?.close();
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/stacks/${stackId}/logs/ws`);
-    wsRef.current = ws;
-    ws.onopen = () => { setConnected(true); setLines([]); };
-    ws.onmessage = (e) => setLines((prev) => [...prev.slice(-999), e.data]);
-    ws.onclose = () => setConnected(false);
-    ws.onerror = () => setConnected(false);
+    esRef.current?.close();
+    setLines([]);
+    lineBuffer.current = [];
+    const es = connectSSE(`/api/stacks/${stackId}/logs/ws`);
+    esRef.current = es;
+
+    es.addEventListener('log', (e: Event) => {
+      const msg = (e as MessageEvent).data;
+      lineBuffer.current.push(msg);
+      if (lineBuffer.current.length > 1000) {
+        lineBuffer.current = lineBuffer.current.slice(-999);
+      }
+      setLines([...lineBuffer.current]);
+    });
+
+    es.addEventListener('error', (e: Event) => {
+      const msg = (e as MessageEvent).data || 'Error del servidor';
+      lineBuffer.current.push(`❌ ${msg}`);
+      setLines([...lineBuffer.current]);
+    });
+
+    es.onopen = () => setConnected(true);
+    es.onerror = () => {
+      setConnected(false);
+      // EventSource will auto-reconnect by default
+    };
   }, [stackId]);
 
-  useEffect(() => { connect(); return () => wsRef.current?.close(); }, [connect]);
+  useEffect(() => { connect(); return () => esRef.current?.close(); }, [connect]);
   useEffect(() => { if (containerRef.current) containerRef.current.scrollTop = containerRef.current.scrollHeight; }, [lines]);
 
   return (
@@ -63,7 +83,7 @@ export function Terminal({ stackId, stackName, height = 400 }: TerminalProps) {
           const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/plain' }));
           a.download = `${stackName}-logs.txt`; a.click();
         }}>Download</Button>
-        <Button size="small" onClick={() => setLines([])}>Clear</Button>
+        <Button size="small" onClick={() => { setLines([]); lineBuffer.current = []; }}>Clear</Button>
         <Tag>{lines.length} lines</Tag>
       </Space>
       <div ref={containerRef} style={{
