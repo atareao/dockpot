@@ -359,3 +359,7 @@ cd backend && cargo test
 ## 📄 Licencia
 
 MIT &copy; 2026 [atareao](https://github.com/atareao)
+
+---
+
+**v0.4.0** — Release [v0.4.0](https://github.com/atareao/dockpot/releases/tag/v0.4.0)

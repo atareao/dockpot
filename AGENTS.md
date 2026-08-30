@@ -14,6 +14,38 @@ Dockpot is a self-hosted Docker Compose stack manager with a web UI. Written in 
       Dockerfile    ← Multi-stage build (frontend → Rust → runtime)
 ```
 
+## Git Flow
+
+This project follows strict gitflow. See [GIT_FLOW.md](./GIT_FLOW.md) for:
+- Branch structure (main, development, feature/*, hotfix/*)
+- Conventional commits with gitmoji
+- How to create features, hotfixes, and releases
+
+### Branch naming rules
+- Features: `feature/<kebab-case-name>`
+- Hotfixes: `hotfix/<kebab-case-name>`
+
+### Commit format
+
+Use gitmoji + conventional commits:
+
+| Tipo | Emoji | Bump |
+|---|---|---|
+| `feat` | ✨ | minor |
+| `fix` | 🐛 | patch |
+| `hotfix` | 🚑️ | patch |
+| `docs` | 📝 | patch |
+| `refactor` | ♻️ | patch |
+| `style` | 💄 | patch |
+| `chore` | 🔧 | patch |
+| `ci` | 👷 | patch |
+
+### Release process
+
+1. PR `feature/*` → `development` (review)
+2. PR `development` → `main` (release)
+3. After merge to main: tag with `vX.Y.Z` and sync development
+
 ## Backend Architecture
 
 | Layer | Details |
