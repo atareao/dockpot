@@ -1,5 +1,69 @@
 use serde::{Deserialize, Serialize};
 
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+
+// ───── Errors ─────
+
+#[derive(Debug, thiserror::Error)]
+pub enum AppError {
+    #[error("{0}")]
+    NotFound(String),
+    #[error("{0}")]
+    BadRequest(String),
+    #[error("Docker: {0}")]
+    Docker(String),
+    #[error("{0}")]
+    Internal(String),
+}
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let (status, message) = match &self {
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
+            AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            AppError::Docker(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
+            AppError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
+        };
+        (status, serde_json::json!({"error": message}).to_string()).into_response()
+    }
+}
+
+impl From<bollard::errors::Error> for AppError {
+    fn from(e: bollard::errors::Error) -> Self {
+        AppError::Docker(e.to_string())
+    }
+}
+
+impl From<anyhow::Error> for AppError {
+    fn from(e: anyhow::Error) -> Self {
+        AppError::Internal(e.to_string())
+    }
+}
+
+// ───── Helpers ─────
+
+/// Strip the leading slash from Docker container names.
+pub fn strip_name(name: &str) -> String {
+    name.trim_start_matches('/').to_string()
+}
+
+/// Parse an image reference into (name, tag).
+pub fn parse_image_tag(image: &str) -> (String, String) {
+    if let Some(pos) = image.find('@') {
+        (image[..pos].to_string(), String::new())
+    } else if let Some((n, t)) = image.rsplit_once(':') {
+        (n.to_string(), t.to_string())
+    } else {
+        (image.to_string(), "latest".into())
+    }
+}
+
+/// Return the current CPU architecture for pulling matching Docker images.
+pub fn current_platform() -> Option<String> {
+    Some(std::env::consts::ARCH.to_string())
+}
+
 // ───── Stack ─────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -14,7 +78,7 @@ pub struct Stack {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone)]
 pub struct StackRow {
     pub id: String,
     pub name: String,
@@ -55,7 +119,7 @@ pub struct StackSync {
     pub status: String,
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone)]
 pub struct StackSyncRow {
     pub stack_id: String,
     pub sync_type: String,
@@ -115,7 +179,7 @@ pub struct EnvFile {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone)]
 pub struct EnvFileRow {
     pub id: String,
     pub stack_id: String,
@@ -151,7 +215,7 @@ pub struct Notifier {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone)]
 pub struct NotifierRow {
     pub id: String,
     pub name: String,
@@ -232,74 +296,6 @@ pub struct GitDiff {
     pub diff_text: String,
 }
 
-// ───── Agent ─────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Agent {
-    pub id: String,
-    pub name: String,
-    pub agent_type: String,
-    pub host: String,
-    pub port: u16,
-    pub tls_enabled: bool,
-    pub ca_cert: Option<String>,
-    pub client_cert: Option<String>,
-    pub client_key: Option<String>,
-    pub description: Option<String>,
-    pub enabled: bool,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub struct AgentRow {
-    pub id: String,
-    pub name: String,
-    pub agent_type: String,
-    pub host: String,
-    pub port: i64,
-    pub tls_enabled: i32,
-    pub ca_cert: Option<String>,
-    pub client_cert: Option<String>,
-    pub client_key: Option<String>,
-    pub description: Option<String>,
-    pub enabled: i32,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-impl From<AgentRow> for Agent {
-    fn from(row: AgentRow) -> Self {
-        Agent {
-            id: row.id,
-            name: row.name,
-            agent_type: row.agent_type,
-            host: row.host,
-            port: row.port as u16,
-            tls_enabled: row.tls_enabled != 0,
-            ca_cert: row.ca_cert,
-            client_cert: row.client_cert,
-            client_key: row.client_key,
-            description: row.description,
-            enabled: row.enabled != 0,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct CreateAgentRequest {
-    pub name: String,
-    pub host: String,
-    pub port: Option<u16>,
-    pub tls_enabled: Option<bool>,
-    pub ca_cert: Option<String>,
-    pub client_cert: Option<String>,
-    pub client_key: Option<String>,
-    pub description: Option<String>,
-}
-
 // ───── Backup Schedule ─────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -316,7 +312,7 @@ pub struct BackupSchedule {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone)]
 pub struct BackupScheduleRow {
     pub id: String,
     pub enabled: i32,
@@ -474,55 +470,6 @@ mod tests {
         let n: Notifier = row.into();
         // Falls back to Null on invalid JSON
         assert_eq!(n.config_json, serde_json::Value::Null);
-    }
-
-    // ── Agent ──
-
-    #[test]
-    fn test_agent_from_row() {
-        let row = AgentRow {
-            id: "a1".into(),
-            name: "docker-01".into(),
-            agent_type: "docker".into(),
-            host: "192.168.1.100".into(),
-            port: 2376,
-            tls_enabled: 1,
-            ca_cert: Some("cert".into()),
-            client_cert: None,
-            client_key: None,
-            description: Some("Main host".into()),
-            enabled: 1,
-            created_at: String::new(),
-            updated_at: String::new(),
-        };
-        let a: Agent = row.into();
-        assert_eq!(a.name, "docker-01");
-        assert_eq!(a.host, "192.168.1.100");
-        assert_eq!(a.port, 2376);
-        assert!(a.tls_enabled);
-        assert!(a.enabled);
-    }
-
-    #[test]
-    fn test_agent_disabled() {
-        let row = AgentRow {
-            id: "a2".into(),
-            name: "offline".into(),
-            agent_type: "docker".into(),
-            host: "10.0.0.1".into(),
-            port: 2375,
-            tls_enabled: 0,
-            ca_cert: None,
-            client_cert: None,
-            client_key: None,
-            description: None,
-            enabled: 0,
-            created_at: String::new(),
-            updated_at: String::new(),
-        };
-        let a: Agent = row.into();
-        assert!(!a.enabled);
-        assert!(!a.tls_enabled);
     }
 
     // ── DashboardStatus ──

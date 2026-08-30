@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use axum::extract::State;
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;
@@ -7,7 +5,7 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::auth::AppState;
+use crate::state::AppState;
 
 #[derive(Deserialize)]
 pub struct LogsQuery {
@@ -16,7 +14,7 @@ pub struct LogsQuery {
 }
 
 pub async fn get_logs(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(stack_id): Path<String>,
     Query(query): Query<LogsQuery>,
 ) -> Result<Json<Value>, (StatusCode, String)> {

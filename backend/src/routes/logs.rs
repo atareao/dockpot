@@ -1,158 +1,92 @@
-use std::sync::Arc;
+use axum::{
+    extract::{Path, State},
+    response::sse::{Event, KeepAlive, Sse},
+};
+use bollard::{container::LogOutput, container::LogsOptions, Docker};
+use futures::StreamExt;
+use std::convert::Infallible;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Path, State};
-use axum::response::IntoResponse;
-use futures::{SinkExt, StreamExt};
-use tokio::io::AsyncBufReadExt;
-use tokio::process::Command;
+use crate::db::Database;
+use crate::models::AppError;
 
-use crate::auth::AppState;
-
-pub async fn logs_ws_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<Arc<AppState>>,
+/// SSE handler for streaming Docker container logs of a stack.
+///
+/// The `id` path parameter is a **stack ID** (UUID). The handler looks up
+/// the stack in the database, resolves its name, and uses that name as the
+/// Docker container name for `docker.logs()`.
+///
+/// # Current limitation (temporal adaptation)
+///
+/// Bollard requires a specific container name, not a compose project name.
+/// For stacks deployed via Docker Compose, containers are typically named
+/// `{project}_{service}_{N}`.  This handler currently uses **the stack name
+/// directly** as the container name, which only works when the stack name
+/// happens to match a running container (e.g. single-service stacks).
+///
+/// Future work: resolve all containers belonging to a compose project and
+/// multiplex their log streams into a single SSE connection.
+pub async fn logs_sse_handler(
+    State(docker): State<Docker>,
+    State(db): State<Database>,
     Path(id): Path<String>,
-) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_logs_socket(socket, state, id))
-}
+) -> Result<Sse<impl futures::Stream<Item = Result<Event, Infallible>>>, AppError> {
+    // ── Look up stack in DB ──────────────────────────────────────────
+    let stack = db
+        .get_stack(&id)
+        .await
+        .map_err(|e| AppError::Internal(format!("Database error looking up stack: {e}")))?
+        .ok_or_else(|| AppError::NotFound(format!("Stack '{id}' not found")))?;
 
-async fn handle_logs_socket(mut socket: WebSocket, state: Arc<AppState>, id: String) {
-    let stack = match state.db.get_stack(&id).await {
-        Ok(Some(s)) => s,
-        Ok(None) => {
-            let _ = socket
-                .send(Message::Text("❌ Stack not found".into()))
-                .await;
-            return;
-        }
-        Err(e) => {
-            let _ = socket
-                .send(Message::Text(format!("❌ DB error: {}", e).into()))
-                .await;
-            return;
-        }
+    // ── Configure Bollard log stream ─────────────────────────────────
+    //
+    // NOTE: The stack name is used as the container name.  This works for
+    // stacks that match a running container name directly.  Compose-project
+    // multiplexing will be added in a future iteration.
+    let options = LogsOptions::<String> {
+        follow: true,
+        stdout: true,
+        stderr: true,
+        tail: "100".to_string(),
+        ..Default::default()
     };
 
-    let compose_path = format!("{}/compose.yaml", stack.path);
+    let stream = docker.logs(&stack.name, Some(options));
+    let mut stream = Box::pin(stream);
 
-    // Spawn docker compose logs -f
-    let mut child = match Command::new("docker")
-        .args([
-            "compose",
-            "-f",
-            &compose_path,
-            "logs",
-            "-f",
-            "--tail=100",
-            "--no-color",
-        ])
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .kill_on_drop(true)
-        .spawn()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            let _ = socket
-                .send(Message::Text(
-                    format!("❌ Failed to spawn docker: {}", e).into(),
-                ))
-                .await;
-            return;
-        }
-    };
+    // ── Bridge Bollard stream → SSE channel ─────────────────────────
+    let (tx, rx) = mpsc::channel::<Result<Event, Infallible>>(100);
 
-    let (stdout, stderr) = match (child.stdout.take(), child.stderr.take()) {
-        (Some(o), Some(e)) => (o, e),
-        _ => {
-            let _ = socket
-                .send(Message::Text("❌ Failed to capture output".into()))
-                .await;
-            return;
-        }
-    };
-
-    let (mut ws_tx, mut ws_rx) = socket.split();
-
-    // Send initial message
-    let _ = ws_tx
-        .send(Message::Text(
-            format!("📋 Connecting to logs for '{}'...\n", stack.name).into(),
-        ))
-        .await;
-
-    // Channel to bridge stdout/stderr to WebSocket
-    let (log_tx, mut log_rx) = tokio::sync::mpsc::channel::<String>(256);
-
-    // Read stdout task
-    let tx1 = log_tx.clone();
-    let stdout_task = tokio::spawn(async move {
-        let mut reader = tokio::io::BufReader::new(stdout);
-        let mut line = String::new();
-        loop {
-            line.clear();
-            match reader.read_line(&mut line).await {
-                Ok(0) => break,
+    tokio::spawn(async move {
+        while let Some(item) = stream.next().await {
+            match item {
+                Ok(LogOutput::StdOut { message }) | Ok(LogOutput::StdErr { message }) => {
+                    let text = String::from_utf8_lossy(&message).to_string();
+                    if tx
+                        .send(Ok(Event::default().event("log").data(text)))
+                        .await
+                        .is_err()
+                    {
+                        // Receiver dropped (client disconnected)
+                        break;
+                    }
+                }
                 Ok(_) => {
-                    let msg = line.trim_end().to_string();
-                    if tx1.send(msg).await.is_err() {
-                        break;
-                    }
+                    // Other log output types (e.g. console) — skip
+                    continue;
                 }
-                Err(_) => break,
-            }
-        }
-    });
-
-    // Read stderr task
-    let tx2 = log_tx;
-    let stderr_task = tokio::spawn(async move {
-        let mut reader = tokio::io::BufReader::new(stderr);
-        let mut line = String::new();
-        loop {
-            line.clear();
-            match reader.read_line(&mut line).await {
-                Ok(0) => break,
-                Ok(_) => {
-                    let msg = format!("⚠️ {}", line.trim_end());
-                    if tx2.send(msg).await.is_err() {
-                        break;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    });
-
-    // Forward logs from channel to WebSocket, or handle close
-    let ws_to_log = tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                Some(msg) = log_rx.recv() => {
-                    if ws_tx.send(Message::Text(msg.into())).await.is_err() {
-                        break;
-                    }
-                }
-                ws_msg = ws_rx.next() => {
-                    match ws_msg {
-                        Some(Ok(Message::Close(_))) | None => break,
-                        Some(Ok(Message::Ping(data))) => {
-                            let _ = ws_tx.send(Message::Pong(data)).await;
-                        }
-                        Some(Err(_)) => break,
-                        _ => {}
-                    }
+                Err(e) => {
+                    let _ = tx
+                        .send(Ok(Event::default()
+                            .event("error")
+                            .data(format!("Docker error: {e}"))))
+                        .await;
+                    break;
                 }
             }
         }
     });
 
-    // Wait for everything to finish
-    let _ = tokio::join!(stdout_task, stderr_task, ws_to_log);
-
-    // Cleanup
-    let _ = child.kill().await;
-    let _ = child.wait().await;
-    tracing::info!("🔌 Logs WebSocket closed for stack '{}'", stack.name);
+    Ok(Sse::new(ReceiverStream::new(rx)).keep_alive(KeepAlive::default()))
 }

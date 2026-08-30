@@ -1,5 +1,9 @@
 const API_BASE = '';
 
+export function connectSSE(path: string): EventSource {
+  return new EventSource(path, { withCredentials: true });
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: {
@@ -12,7 +16,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     if (res.status === 401) {
-      window.location.href = '/auth/login';
+      window.location.href = '/api/auth/login';
       throw new Error('Unauthorized');
     }
     const error = await res.text();
@@ -103,22 +107,6 @@ export interface GitDiff {
   diff_text: string;
 }
 
-export interface Agent {
-  id: string;
-  name: string;
-  agent_type: string;
-  host: string;
-  port: number;
-  tls_enabled: boolean;
-  ca_cert: string | null;
-  client_cert: string | null;
-  client_key: string | null;
-  description: string | null;
-  enabled: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 export const api = {
   // Health
   health: () => request<{ status: string }>('/health'),
@@ -181,15 +169,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ command, service_name: serviceName }),
     }),
-
-  // Agents
-  listAgents: () => request<Agent[]>('/api/agents'),
-  getAgent: (id: string) => request<Agent>(`/api/agents/${id}`),
-  createAgent: (data: { name: string; host: string; port?: number; description?: string }) =>
-    request<Agent>('/api/agents', { method: 'POST', body: JSON.stringify(data) }),
-  updateAgent: (id: string, data: { name: string; host: string; port?: number; description?: string }) =>
-    request<Agent>(`/api/agents/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteAgent: (id: string) => request<void>(`/api/agents/${id}`, { method: 'DELETE' }),
 
   // Docker Info
   getDockerInfo: () => request<DockerInfo>('/api/docker/info'),

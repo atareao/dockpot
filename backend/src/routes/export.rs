@@ -1,14 +1,12 @@
-use std::sync::Arc;
-
 use axum::body::Body;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 
-use crate::auth::AppState;
+use crate::state::AppState;
 
 pub async fn export_zip(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Response, (StatusCode, String)> {
     let stack = state
@@ -51,7 +49,7 @@ pub async fn export_zip(
     }
 
     // Create zip
-    let zip_path = std::env::temp_dir().join(format!("dockpot-{}.zip", &stack.name));
+    let zip_path = std::env::temp_dir().join(format!("dockpot-{}.zip", stack.name));
     let _ = std::process::Command::new("zip")
         .args(["-r", zip_path.to_str().unwrap_or(""), "."])
         .current_dir(&tmp_dir)
@@ -69,7 +67,7 @@ pub async fn export_zip(
     let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
     let _ = tokio::fs::remove_file(&zip_path).await;
 
-    let filename = format!("{}-stack.zip", &stack.name);
+    let filename = format!("{}-stack.zip", stack.name);
     let response = Response::builder()
         .header("Content-Type", "application/zip")
         .header(

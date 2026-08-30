@@ -1,16 +1,14 @@
-use std::sync::Arc;
-
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::auth::AppState;
 use crate::models::{CreateNotifierRequest, Notifier};
 use crate::notifier;
+use crate::state::AppState;
 
-pub async fn list(State(state): State<Arc<AppState>>) -> Result<Json<Value>, (StatusCode, String)> {
+pub async fn list(State(state): State<AppState>) -> Result<Json<Value>, (StatusCode, String)> {
     let notifiers = state
         .db
         .list_notifiers()
@@ -20,7 +18,7 @@ pub async fn list(State(state): State<Arc<AppState>>) -> Result<Json<Value>, (St
 }
 
 pub async fn create(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Json(req): Json<CreateNotifierRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     if req.name.trim().is_empty() || req.notifier_type.trim().is_empty() {
@@ -53,7 +51,7 @@ pub async fn create(
 }
 
 pub async fn update(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
     Json(req): Json<CreateNotifierRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
@@ -89,7 +87,7 @@ pub async fn update(
 }
 
 pub async fn delete(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let deleted = state
@@ -107,7 +105,7 @@ pub async fn delete(
 }
 
 pub async fn test(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let notifier = state
@@ -137,7 +135,7 @@ pub async fn test(
 }
 
 pub async fn set_stack_notifiers(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(stack_id): Path<String>,
     Json(ids): Json<Vec<String>>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
@@ -150,7 +148,7 @@ pub async fn set_stack_notifiers(
 }
 
 pub async fn get_stack_notifiers(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Path(stack_id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let ids = state
