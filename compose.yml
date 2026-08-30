@@ -1,62 +1,44 @@
-# ═══════════════════════════════════════════════════════════════
-# Dockpot — Docker Stack Manager
-# ═══════════════════════════════════════════════════════════════
-#
-# Uso:
-#   docker compose up -d
-#   docker compose logs -f
-#   docker compose down
-#
-# Requiere montar /var/run/docker.sock para gestionar stacks.
-# ═══════════════════════════════════════════════════════════════
-
 services:
   dockpot:
-    image: ghcr.io/atareao/dockpot:latest
+    build: .
     container_name: dockpot
-    restart: unless-stopped
-
     ports:
       - "3056:3056"
-
-    environment:
-      # ── OIDC Authentication ──────────────────────────────
-      OIDC_ISSUER_URL: "${OIDC_ISSUER_URL}"
-      OIDC_CLIENT_ID: "${OIDC_CLIENT_ID}"
-      OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET}"
-      OIDC_REDIRECT_URL: "${OIDC_REDIRECT_URL:-http://localhost:3056/auth/callback}"
-      OIDC_SCOPES: "${OIDC_SCOPES:-openid profile email}"
-
-      # ── JWT ──────────────────────────────────────────────
-      JWT_SECRET: "${JWT_SECRET}"
-
-      # ── Server ───────────────────────────────────────────
-      HOST: "${HOST:-0.0.0.0}"
-      PORT: "${PORT:-3056}"
-      DATABASE_URL: "${DATABASE_URL:-sqlite:///app/data/dockpot.db}"
-      DATA_DIR: "${DATA_DIR:-/app/data}"
-      STACKS_DIR: "${STACKS_DIR:-/app/stacks}"
-
-      # ── Docker ───────────────────────────────────────────
-      DOCKER_HOST: "${DOCKER_HOST:-unix:///var/run/docker.sock}"
-
-      # ── Logging ──────────────────────────────────────────
-      RUST_LOG: "${RUST_LOG:-info}"
-
+    user: root:root
     volumes:
-      # Socket Docker para gestionar contenedores
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Datos persistentes (SQLite + stacks)
-      - dockpot_data:/app/data
-      - dockpot_stacks:/app/stacks
-
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:3056/health"]
-      interval: 30s
-      timeout: 5s
-      start_period: 10s
-      retries: 3
+      # ── Socket de Podman (rootless) ──────────────────────────
+      # Monta el socket de podman donde bollard y docker CLI lo esperan
+      - /run/user/1000/podman/podman.sock:/var/run/docker.sock:z
+      #
+      # ── Host filesystem (lectura) para discover/import ────────
+      # Necesario para leer ficheros compose de proyectos externos.
+      # Ajusta la ruta si tus proyectos están en otro directorio.
+      - /data:/data:ro
+      #
+      # ── Datos ─────────────────────────────────────────────────
+      - dockpot-data:/app/data
+      - dockpot-stacks:/app/stacks
+      # ── Templates (override) ─────────────────────────────────
+      - ./templates:/app/templates:ro
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3056
+      - DATA_DIR=/app/data
+      - DATABASE_URL=/app/data/dockpot.db
+      - STACKS_DIR=/app/stacks
+      - RUST_LOG=info
+      - LOG_FORMAT=pretty
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      # ── Modo dev (sin OIDC) ──
+      # Sin OIDC_ISSUER_URL → dockpot arranca en modo dev sin auth
+      #
+      # Para producción, descomenta estas líneas:
+      # - OIDC_ISSUER_URL=https://auth.tudominio.com
+      # - OIDC_CLIENT_ID=dockpot
+      # - OIDC_CLIENT_SECRET=xxxx
+      # - OIDC_REDIRECT_URL=http://localhost:3056/auth/callback
+    restart: unless-stopped
 
 volumes:
-  dockpot_data:
-  dockpot_stacks:
+  dockpot-data:
+  dockpot-stacks:

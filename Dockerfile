@@ -1,15 +1,17 @@
 # ═══════════════════════════════════════════════════════════════
-# Stage 1: Frontend (npm)
+# Stage 1: Frontend (pnpm)
 # ═══════════════════════════════════════════════════════════════
 # MUST be first — backend embeds the dist at compile time via include_dir!
 FROM docker.io/library/node:23-alpine AS frontend-builder
 
+RUN npm install -g pnpm@latest
+
 WORKDIR /build
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --ignore-scripts && pnpm rebuild esbuild
 
 COPY frontend/ ./
-RUN npm run build
+RUN CI=true pnpm build
 
 # ═══════════════════════════════════════════════════════════════
 # Stage 2: Backend (Rust)
@@ -61,6 +63,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 COPY --from=backend-builder /build/target/release/dockpot /usr/local/bin/dockpot
 COPY --from=frontend-builder /build/dist ./dist
+COPY templates /app/templates
 
 RUN mkdir -p /app/data /app/stacks && chown -R app:app /app
 
