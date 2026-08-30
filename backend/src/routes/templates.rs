@@ -6,21 +6,21 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::state::AppState;
+use crate::config::Config;
 use crate::templates;
 
 pub async fn list_templates(
-    State(_state): State<AppState>,
+    State(config): State<Config>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    let templates = templates::get_templates();
+    let templates = templates::get_templates(&config.templates_dir);
     Ok(Json(serde_json::json!(templates)))
 }
 
 pub async fn get_template(
-    State(_state): State<AppState>,
+    State(config): State<Config>,
     Path(name): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    let templates = templates::get_templates();
+    let templates = templates::get_templates(&config.templates_dir);
     let tpl = templates
         .into_iter()
         .find(|t| t.name == name)
@@ -41,10 +41,10 @@ pub struct RenderRequest {
 }
 
 pub async fn render_template(
-    State(_state): State<AppState>,
+    State(config): State<Config>,
     Json(req): Json<RenderRequest>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    let templates = templates::get_templates();
+    let templates = templates::get_templates(&config.templates_dir);
     let tpl = templates
         .into_iter()
         .find(|t| t.name == req.template)
