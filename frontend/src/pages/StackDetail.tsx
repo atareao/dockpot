@@ -2,19 +2,24 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Typography, Spin, Button, Space, Tag, Card, Descriptions, App as AntApp, Layout,
-  Alert, Switch, Modal,
+  Alert, Switch, Modal, Tabs, Divider, Dropdown,
 } from 'antd';
 import { ArrowLeftOutlined, PlayCircleOutlined, StopOutlined, ReloadOutlined,
   CloudUploadOutlined, CheckCircleOutlined, CloseCircleOutlined,
-  DownloadOutlined, GithubOutlined, CodeOutlined,
+  DownloadOutlined, GithubOutlined, CodeOutlined, MoreOutlined,
 } from '@ant-design/icons';
 import { api, Stack, StackSync } from '../api/http';
 import { YamlEditor } from '../components/YamlEditor';
 import { Terminal } from '../components/Terminal';
 import { DiffViewer } from '../components/DiffViewer';
+import { useTheme } from '../main';
 
 const { Title, Text } = Typography;
 const { Content, Header } = Layout;
+
+function isMobile() {
+  return window.innerWidth < 768;
+}
 
 export function StackDetail() {
   const { id } = useParams<{ id: string }>();
@@ -41,6 +46,7 @@ export function StackDetail() {
   const [yamlErrors, setYamlErrors] = useState<string[]>([]);
   const { message } = AntApp.useApp();
   const navigate = useNavigate();
+  const { darkMode } = useTheme();
 
   const loadStack = useCallback(async () => {
     if (!id) return;
@@ -52,7 +58,7 @@ export function StackDetail() {
       setOriginalCompose(data.compose);
     } catch (e: any) {
       message.error('Error: ' + e.message);
-      navigate('/stacks');
+      navigate('/');
     } finally {
       setLoading(false);
     }
@@ -139,12 +145,10 @@ export function StackDetail() {
       onOk: async () => {
         try {
           setDeploying(true);
-          // Save if modified
           if (compose !== originalCompose) {
             await api.updateCompose(id, compose);
             setOriginalCompose(compose);
           }
-          // Start the stack
           await api.startStack(id);
           setEditMode(false);
           loadStack();
@@ -191,236 +195,233 @@ export function StackDetail() {
   if (loading) return <Spin size="large" style={{ display: 'block', margin: '40px auto' }} />;
   if (!stack) return null;
 
+  // ── More actions dropdown ──
+  const moreItems = [
+    { key: 'sync', icon: <GithubOutlined />, label: 'Git Sync', onClick: () => { setSyncModalOpen(true); id && api.getSyncConfig(id).then(setSyncConfig).catch(() => {}); } },
+    { key: 'export', icon: <DownloadOutlined />, label: 'Export', onClick: () => api.exportStack(stack.id) },
+    { key: 'diff', icon: <CodeOutlined />, label: 'Diff', onClick: handleShowDiff },
+  ];
+
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center', gap: 16, borderBottom: '1px solid #f0f0f0' }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/stacks')} />
-        <Title level={3} style={{ margin: 0 }}>{stack.name}</Title>
-        <Tag color={stack.status === 'running' ? 'green' : stack.status === 'error' ? 'red' : 'default'}>
+    <Layout style={{ minHeight: '100vh', background: darkMode ? '#000' : '#f5f5f5' }}>
+      <Header style={{
+        background: darkMode ? '#141414' : '#fff',
+        padding: '0 12px',
+        display: 'flex', alignItems: 'center', gap: 8,
+        borderBottom: `1px solid ${darkMode ? '#303030' : '#f0f0f0'}`,
+        flexWrap: 'wrap', minHeight: 48, height: 'auto',
+      }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/')} size="small" />
+        <Title level={4} style={{ margin: 0, fontSize: 16, flex: 1, minWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {stack.name}
+        </Title>
+        <Tag color={stack.status === 'running' ? 'green' : stack.status === 'error' ? 'red' : 'default'} style={{ margin: 0 }}>
           {stack.status}
         </Tag>
-        <div style={{ flex: 1 }} />
-        <Button
-          type="primary"
-          icon={<PlayCircleOutlined />}
-          onClick={() => handleAction('start')}
-          disabled={stack.status === 'running'}
-        >
-          Start
-        </Button>
-        <Button
-          icon={<StopOutlined />}
-          onClick={() => handleAction('stop')}
-          disabled={stack.status !== 'running'}
-        >
-          Stop
-        </Button>
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={() => handleAction('restart')}
-          disabled={stack.status !== 'running'}
-        >
-          Restart
-        </Button>
-        <Button
-          type="primary"
-          ghost
-          icon={<CloudUploadOutlined />}
-          onClick={handleDeploy}
-          loading={deploying}
-        >
-          Deploy
-        </Button>
-        <Button
-          icon={<DownloadOutlined />}
-          onClick={handlePull}
-          loading={pulling}
-        >
-          Update Images
-        </Button>
-        <Button
-          icon={<GithubOutlined />}
-          onClick={() => {
-            setSyncModalOpen(true);
-            id && api.getSyncConfig(id).then(setSyncConfig).catch(() => {});
-          }}
-        >
-          Git Sync
-        </Button>
-        {syncConfig && syncConfig.sync_type !== 'none' && (
-          <Tag color={syncConfig.status === 'synced' ? 'green' : syncConfig.status === 'conflict' ? 'red' : 'orange'}>
-            {syncConfig.status}
-          </Tag>
-        )}
-        <Button icon={<DownloadOutlined />} onClick={() => api.exportStack(stack.id)}>
-          Export
-        </Button>
-        <Button icon={<CodeOutlined />} onClick={handleShowDiff}>Diff</Button>
+
+        {/* Actions: icon-only always, less-used in dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+          <Button size="small" type="primary" icon={<PlayCircleOutlined />} onClick={() => handleAction('start')} disabled={stack.status === 'running'} />
+          <Button size="small" icon={<StopOutlined />} onClick={() => handleAction('stop')} disabled={stack.status !== 'running'} />
+          <Button size="small" icon={<ReloadOutlined />} onClick={() => handleAction('restart')} disabled={stack.status !== 'running'} />
+          <Button size="small" type="primary" ghost icon={<CloudUploadOutlined />} onClick={handleDeploy} loading={deploying} />
+          <Button size="small" icon={<DownloadOutlined />} onClick={handlePull} loading={pulling} />
+          <Dropdown menu={{ items: moreItems }} trigger={['click']}>
+            <Button size="small" icon={<MoreOutlined />} />
+          </Dropdown>
+          {syncConfig && syncConfig.sync_type !== 'none' && (
+            <Tag color={syncConfig.status === 'synced' ? 'green' : syncConfig.status === 'conflict' ? 'red' : 'orange'} style={{ fontSize: 11, margin: 0 }}>
+              {syncConfig.status}
+            </Tag>
+          )}
+        </div>
       </Header>
-      <Content style={{ padding: 24 }}>
-        <Card size="small" style={{ marginBottom: 16 }}>
-          <Descriptions column={2} size="small">
-            <Descriptions.Item label="ID"><Text copyable>{stack.id}</Text></Descriptions.Item>
+
+      <Content style={{ padding: 12, background: darkMode ? '#000' : undefined }}>
+        {/* Info Card — siempre visible */}
+        <Card size="small" styles={{ body: { padding: '8px 12px' } }} style={{ marginBottom: 12 }}>
+          <Descriptions column={{ xs: 1, sm: 3 }} size="small" style={{ marginBottom: 0 }}>
+            <Descriptions.Item label="ID"><Text copyable={{ text: stack.id }} style={{ fontSize: 12 }}>{stack.id.substring(0, 8)}…</Text></Descriptions.Item>
             <Descriptions.Item label="Name">{stack.name}</Descriptions.Item>
-            <Descriptions.Item label="Description">{stack.description || '—'}</Descriptions.Item>
             <Descriptions.Item label="Status">
-              <Tag color={stack.status === 'running' ? 'green' : 'default'}>{stack.status}</Tag>
+              <Tag color={stack.status === 'running' ? 'green' : 'default'} style={{ margin: 0 }}>{stack.status}</Tag>
             </Descriptions.Item>
+            <Descriptions.Item label="Description">{stack.description || '—'}</Descriptions.Item>
             <Descriptions.Item label="Created">{new Date(stack.created_at).toLocaleString()}</Descriptions.Item>
             <Descriptions.Item label="Updated">{new Date(stack.updated_at).toLocaleString()}</Descriptions.Item>
           </Descriptions>
         </Card>
 
-        <Card
-          title={
-            <Space>
-              <span>docker-compose.yaml</span>
-              <Switch
-                checkedChildren={<><CheckCircleOutlined /> Edit</>}
-                unCheckedChildren="Preview"
-                checked={editMode}
-                onChange={(v) => {
-                  if (!v && hasChanges && yamlValid) {
-                    handleSaveCompose();
-                  }
-                  setEditMode(v);
-                }}
-              />
-              {hasChanges && <Tag color="orange">unsaved</Tag>}
-            </Space>
-          }
-          extra={
-            editMode ? (
-              <Space>
-                <Button size="small" onClick={handleValidateSyntax} icon={<CheckCircleOutlined />}>
-                  Validate
-                </Button>
-                <Button
-                  size="small"
-                  type="primary"
-                  onClick={handleSaveCompose}
-                  loading={saving}
-                  disabled={!yamlValid}
-                >
-                  Save
-                </Button>
-                <Button
-                  type="primary"
-                  icon={<CloudUploadOutlined />}
-                  onClick={handleDeploy}
-                  loading={deploying}
-                >
-                  Save & Deploy
-                </Button>
-              </Space>
-            ) : null
-          }
-          style={{ marginTop: 16 }}
-        >
-          {!yamlValid && editMode && yamlErrors.length > 0 && (
-            <Alert
-              type="error"
-              icon={<CloseCircleOutlined />}
-              message={
-                <ul style={{ margin: 0, paddingLeft: 16 }}>
-                  {yamlErrors.map((e, i) => <li key={i}>{e}</li>)}
-                </ul>
-              }
-              style={{ marginBottom: 8 }}
-              showIcon
-            />
-          )}
+        <Card styles={{ body: { padding: 12 } }}>
+          <Tabs
+            defaultActiveKey="compose"
+            size="small"
+            style={{ margin: '-12px' }}
+            items={[
+              {
+                key: 'compose',
+                label: '📄 Compose',
+                children: (
+                  <div style={{ padding: '12px 12px 0' }}>
+                    <Space style={{ marginBottom: 12 }}>
+                      <Switch
+                        checkedChildren={<><CheckCircleOutlined /> Edit</>}
+                        unCheckedChildren="Preview"
+                        size="small"
+                        checked={editMode}
+                        onChange={(v) => {
+                          if (!v && hasChanges && yamlValid) {
+                            handleSaveCompose();
+                          }
+                          setEditMode(v);
+                        }}
+                      />
+                      {hasChanges && <Tag color="orange">unsaved</Tag>}
+                    </Space>
 
-          {editMode ? (
-            <YamlEditor
-              value={compose}
-              onChange={(v) => setCompose(v)}
-              onValidate={(isValid, errors) => {
-                setYamlValid(isValid);
-                setYamlErrors(errors);
-              }}
-              height={500}
-            />
-          ) : (
-            <pre style={{
-              background: '#1e1e1e',
-              color: '#d4d4d4',
-              padding: 16,
-              borderRadius: 6,
-              overflow: 'auto',
-              maxHeight: 400,
-              fontSize: 13,
-              margin: 0,
-            }}>
-              {compose}
-            </pre>
-          )}
-        </Card>
+                    {!yamlValid && editMode && yamlErrors.length > 0 && (
+                      <Alert
+                        type="error"
+                        icon={<CloseCircleOutlined />}
+                        message={
+                          <ul style={{ margin: 0, paddingLeft: 16 }}>
+                            {yamlErrors.map((e, i) => <li key={i}>{e}</li>)}
+                          </ul>
+                        }
+                        style={{ marginBottom: 8 }}
+                        showIcon
+                      />
+                    )}
 
-        <Card title="📋 Live Logs" style={{ marginTop: 16 }}>
-          <Terminal stackId={stack.id} stackName={stack.name} height={350} />
-        </Card>
+                    {editMode ? (
+                      <YamlEditor
+                        value={compose}
+                        onChange={(v) => setCompose(v)}
+                        onValidate={(isValid, errors) => {
+                          setYamlValid(isValid);
+                          setYamlErrors(errors);
+                        }}
+                        height={Math.min(500, window.innerHeight - 350)}
+                      />
+                    ) : (
+                      <pre style={{
+                        background: '#1e1e1e',
+                        color: '#d4d4d4',
+                        padding: 12,
+                        borderRadius: 6,
+                        overflow: 'auto',
+                        maxHeight: Math.min(400, window.innerHeight - 300),
+                        fontSize: 12,
+                        margin: 0,
+                      }}>
+                        {compose}
+                      </pre>
+                    )}
 
-        <Card title="📊 Stats" size="small" style={{ marginTop: 16 }}>
-          {stats ? (
-            <Descriptions column={2} size="small">
-              <Descriptions.Item label="Last Started">
-                {stats.last_started_at ? new Date(stats.last_started_at).toLocaleString() : 'Never'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Total Running">
-                {stats.total_running_seconds > 0
-                  ? `${Math.floor(stats.total_running_seconds / 3600)}h ${Math.floor((stats.total_running_seconds % 3600) / 60)}m`
-                  : '0m'}
-              </Descriptions.Item>
-            </Descriptions>
-          ) : <Text type="secondary">No stats available</Text>}
-        </Card>
+                    {editMode && (
+                      <div style={{
+                        display: 'flex', gap: 8, marginTop: 12,
+                        flexDirection: isMobile() ? 'column' : 'row',
+                      }}>
+                        <Button size="small" onClick={handleValidateSyntax} icon={<CheckCircleOutlined />} block={isMobile()}>
+                          Validate
+                        </Button>
+                        <Button size="small" type="primary" onClick={handleSaveCompose} loading={saving} disabled={!yamlValid} block={isMobile()}>
+                          Save
+                        </Button>
+                        <Button size="small" type="primary" icon={<CloudUploadOutlined />} onClick={handleDeploy} loading={deploying} block={isMobile()}>
+                          Save & Deploy
+                        </Button>
+                      </div>
+                    )}
 
-        <Card title="🔤 Environment Files" size="small" style={{ marginTop: 16 }}
-          extra={<Button size="small" type="primary" onClick={() => {
-            setEnvFilename('.env'); setEnvContent(''); setNotifierModalOpen(true);
-          }}>Add .env</Button>}
-        >
-          {envFiles.length === 0 ? <Text type="secondary">No env files</Text> : (
-            <Space wrap>
-              {envFiles.map((env) => (
-                <Tag key={env.id} closable onClose={async () => {
-                  await api.deleteEnvFile(stack.id, env.filename);
-                  loadEnvFiles();
-                }} style={{ cursor: 'pointer' }} onClick={() => {
-                  setEnvFilename(env.filename);
-                  setEnvContent(env.content);
-                  setNotifierModalOpen(true);
-                }}>
-                  {env.filename}
-                </Tag>
-              ))}
-            </Space>
-          )}
-        </Card>
-
-        <Card title="📢 Notifiers" size="small" style={{ marginTop: 16 }}>
-          {notifiers.length === 0 ? <Text type="secondary">No notifiers configured</Text> : (
-            <Space wrap>
-              {notifiers.map((n) => (
-                <Tag
-                  key={n.id}
-                  color={stackNotifiers.includes(n.id) ? 'blue' : 'default'}
-                  style={{ cursor: 'pointer' }}
-                  onClick={async () => {
-                    const current = await api.getStackNotifiers(stack.id);
-                    const updated = current.includes(n.id)
-                      ? current.filter((x: string) => x !== n.id)
-                      : [...current, n.id];
-                    await api.setStackNotifiers(stack.id, updated);
-                    setStackNotifiers(updated);
-                  }}
-                >
-                  {n.name} ({n.notifier_type})
-                </Tag>
-              ))}
-            </Space>
-          )}
+                    {/* Env Files — dentro del mismo tab */}
+                    <Divider style={{ marginTop: 16, marginBottom: 12 }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <Text strong style={{ fontSize: 13 }}>🔤 Environment Files</Text>
+                      <Button size="small" type="primary" onClick={() => {
+                        setEnvFilename('.env'); setEnvContent(''); setNotifierModalOpen(true);
+                      }}>Add .env</Button>
+                    </div>
+                    {envFiles.length === 0 ? <Text type="secondary" style={{ fontSize: 13 }}>No env files</Text> : (
+                      <Space wrap>
+                        {envFiles.map((env) => (
+                          <Tag key={env.id} closable onClose={async () => {
+                            await api.deleteEnvFile(stack.id, env.filename);
+                            loadEnvFiles();
+                          }} style={{ cursor: 'pointer' }} onClick={() => {
+                            setEnvFilename(env.filename);
+                            setEnvContent(env.content);
+                            setNotifierModalOpen(true);
+                          }}>
+                            {env.filename}
+                          </Tag>
+                        ))}
+                      </Space>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: 'logs',
+                label: '📋 Logs',
+                children: (
+                  <div style={{ padding: '12px 12px 0' }}>
+                    <Terminal stackId={stack.id} stackName={stack.name} height={Math.min(500, window.innerHeight - 250)} />
+                  </div>
+                ),
+              },
+              {
+                key: 'stats',
+                label: '📊 Stats',
+                children: (
+                  <div style={{ padding: '12px 12px 0' }}>
+                    {stats ? (
+                      <Descriptions column={{ xs: 1, sm: 2 }} size="small">
+                        <Descriptions.Item label="Last Started">
+                          {stats.last_started_at ? new Date(stats.last_started_at).toLocaleString() : 'Never'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Total Running">
+                          {stats.total_running_seconds > 0
+                            ? `${Math.floor(stats.total_running_seconds / 3600)}h ${Math.floor((stats.total_running_seconds % 3600) / 60)}m`
+                            : '0m'}
+                        </Descriptions.Item>
+                      </Descriptions>
+                    ) : <Text type="secondary">No stats available</Text>}
+                  </div>
+                ),
+              },
+              {
+                key: 'notifiers',
+                label: '📢 Notifiers',
+                children: (
+                  <div style={{ padding: '12px 12px 0' }}>
+                    {notifiers.length === 0 ? <Text type="secondary">No notifiers configured</Text> : (
+                      <Space wrap>
+                        {notifiers.map((n) => (
+                          <Tag
+                            key={n.id}
+                            color={stackNotifiers.includes(n.id) ? 'blue' : 'default'}
+                            style={{ cursor: 'pointer' }}
+                            onClick={async () => {
+                              const current = await api.getStackNotifiers(stack.id);
+                              const updated = current.includes(n.id)
+                                ? current.filter((x: string) => x !== n.id)
+                                : [...current, n.id];
+                              await api.setStackNotifiers(stack.id, updated);
+                              setStackNotifiers(updated);
+                            }}
+                          >
+                            {n.name} ({n.notifier_type})
+                          </Tag>
+                        ))}
+                      </Space>
+                    )}
+                  </div>
+                ),
+              },
+            ]}
+          />
         </Card>
 
         <Modal
@@ -453,9 +454,8 @@ export function StackDetail() {
           }}
           width={600}
         >
-
-        <div style={{ marginBottom: 8 }}>
-          <label>Filename:</label>
+          <div style={{ marginBottom: 8 }}>
+            <label>Filename:</label>
             <input value={envFilename} onChange={(e) => setEnvFilename(e.target.value)}
               style={{ width: '100%', padding: '4px 8px', borderRadius: 4, border: '1px solid #d9d9d9', fontSize: 14 }}
             />
@@ -573,7 +573,7 @@ function SyncConfigForm({ stackId, stackName, config, onSaved }: {
         </>
       )}
 
-      <Space style={{ marginTop: 8 }}>
+      <Space style={{ marginTop: 8 }} wrap>
         <Button type="primary" onClick={handleSave} loading={syncing}>
           Save Config
         </Button>

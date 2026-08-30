@@ -84,6 +84,18 @@ export interface StackStats {
   total_running_seconds: number;
 }
 
+export interface ExternalProject {
+  name: string;
+  status: string;
+  config_files?: string;
+  compose?: string;
+  managed: boolean;
+  type?: string;
+  image?: string;
+  ports?: string;
+  container_id?: string;
+}
+
 export interface StackSync {
   stack_id: string;
   sync_type: string;
@@ -202,6 +214,13 @@ export const api = {
   getStackNotifiers: (id: string) => request<string[]>(`/api/stacks/${id}/notifiers`),
   setStackNotifiers: (id: string, notifierIds: string[]) =>
     request<void>(`/api/stacks/${id}/notifiers`, { method: 'PUT', body: JSON.stringify({ notifier_ids: notifierIds }) }),
+
+  // Discover & Import external projects
+  discoverProjects: () => request<ExternalProject[]>('/api/stacks/discover'),
+  importProject: (name: string) => request<Stack>('/api/stacks/import', { method: 'POST', body: JSON.stringify({ name }) }),
+  createFromContainer: (containerName: string) => request<Stack>('/api/stacks/create-from-container', {
+    method: 'POST', body: JSON.stringify({ container_name: containerName }),
+  }),
 
   // Export
   exportStack: (id: string) => {
