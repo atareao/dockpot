@@ -1,0 +1,31 @@
+name: redis
+description: "Redis key-value store"
+category: database
+variables:
+  - name: REDIS_TAG
+    description: "Redis image tag"
+    default: "7-alpine"
+    required: false
+  - name: REDIS_PASSWORD
+    description: "Redis password (leave empty for none)"
+    default: ""
+    required: false
+  - name: REDIS_PORT
+    description: "Redis port"
+    default: "6379"
+    required: false
+  - name: REDIS_DATA_DIR
+    description: "Data directory"
+    default: "./redis/data"
+    required: false
+compose: |
+  services:
+    redis:
+      image: redis:${REDIS_TAG:-7-alpine}
+      container_name: ${STACK_NAME}-redis
+      command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+      ports:
+        - "${REDIS_PORT:-6379}:6379"
+      volumes:
+        - ${REDIS_DATA_DIR:-./redis/data}:/data
+      restart: unless-stopped

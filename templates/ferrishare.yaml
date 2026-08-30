@@ -1,0 +1,28 @@
+name: ferrishare
+category: tools
+description: Ferris hare - Rust-based file sharing server
+variables:
+- name: FERRI_PORT
+  description: Ferris hare web port
+  default: '8080'
+  required: false
+- name: FERRI_TAG
+  description: Ferris hare image tag
+  default: latest
+  required: false
+compose: |
+  services:
+    ferrishare:
+      image: ghcr.io/tobiasmarschner/ferrishare:${FERRI_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      init: true
+      volumes:
+        - ${STACK_NAME}_data:/app/data
+      networks:
+        - proxy
+  volumes:
+    ${STACK_NAME}_data:
+  networks:
+    proxy:
+      external: true

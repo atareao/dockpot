@@ -1,0 +1,16 @@
+name: gotify
+category: communication
+description: Push notification server
+variables:
+- name: GOTIFY_PORT
+  description: Gotify Port
+  default: '8080'
+  required: false
+- name: GOTIFY_TAG
+  description: Gotify Tag
+  default: latest
+  required: false
+compose: "version: '3'\n\nservices:\n  gotify:\n    image: gotify/server:${GOTIFY_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    ports:\n      - \"${GOTIFY_PORT}:80\"\n\
+  \    volumes:\n      - ${STACK_NAME}_data:/app/data\n    networks:\n      - proxy\n\
+  \nnetworks:\n  proxy:\n    external: true"

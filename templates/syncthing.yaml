@@ -1,0 +1,19 @@
+name: syncthing
+category: tools
+description: Syncthing file synchronization with discovery and relay
+variables:
+- name: ST_PORT
+  description: St Port
+  default: '8384'
+  required: false
+- name: ST_TAG
+  description: St Tag
+  default: latest
+  required: false
+compose: "services:\n  syncthing:\n    image: syncthing/syncthing:${ST_TAG}\n    hostname:\
+  \ syncthing\n    container_name: ${STACK_NAME}\n    restart: unless-stopped\n  \
+  \  init: true\n    environment:\n      PUID: \"1000\"\n      PGID: \"1000\"\n  \
+  \  volumes:\n      - ${STACK_NAME}_data:/var/syncthing\n    ports:\n      - \"${ST_PORT}:8384\"\
+  \n    healthcheck:\n      test: curl -fkLsS -m 2 127.0.0.1:8384/rest/noauth/health\
+  \ | grep -o --color=never OK || exit 1\n      interval: 1m\n      timeout: 10s\n\
+  \      retries: 3"

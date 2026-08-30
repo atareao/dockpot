@@ -1,0 +1,17 @@
+name: opengist
+category: tools
+description: OpenGist pastebin/gist server
+variables:
+- name: OG_PORT
+  description: Og Port
+  default: '6157'
+  required: false
+- name: OG_TAG
+  description: Og Tag
+  default: latest
+  required: false
+compose: "services:\n  opengist:\n    restart: unless-stopped\n    image: ghcr.io/thomiceli/opengist:${OG_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    init: true\n    volumes:\n      - ${STACK_NAME}_data:/opengist\n\
+  \    environment:\n      UID: 1000\n      GID: 1000\n    ports:\n      - \"${OG_PORT}:6157\"\
+  \n    networks:\n      - proxy\n\nnetworks:\n  proxy:\n    external: true\n\nvolumes:\n\
+  \  ${STACK_NAME}_data: {}"

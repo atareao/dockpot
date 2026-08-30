@@ -1,0 +1,32 @@
+name: firefly
+category: productivity
+description: Personal finance manager with MariaDB
+variables:
+- name: FF_PORT
+  description: Ff Port
+  default: '8080'
+  required: false
+- name: FF_TAG
+  description: Ff Tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Db Pass
+  default: change-me
+  required: true
+- name: APP_KEY
+  description: App Key
+  default: change-me
+  required: true
+compose: "version: '3.3'\n\nservices:\n  fireflyiii:\n    image: fireflyiii/core:${FF_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    restart: unless-stopped\n    volumes:\n\
+  \      - ${STACK_NAME}_upload:/var/www/html/storage/upload\n    environment:\n \
+  \     - APP_KEY=${APP_KEY}\n      - DB_CONNECTION=mysql\n      - DB_HOST=db\n  \
+  \    - DB_PORT=3306\n      - DB_DATABASE=firefly\n      - DB_USERNAME=firefly\n\
+  \      - DB_PASSWORD=${DB_PASS}\n    ports:\n      - \"${FF_PORT}:8080\"\n    depends_on:\n\
+  \      - db\n    networks:\n      - internal\n\n  db:\n    image: yobasystems/alpine-mariadb:latest\n\
+  \    container_name: ${STACK_NAME}_db\n    restart: unless-stopped\n    environment:\n\
+  \      - MYSQL_RANDOM_ROOT_PASSWORD=yes\n      - MYSQL_USER=firefly\n      - MYSQL_PASSWORD=${DB_PASS}\n\
+  \      - MYSQL_DATABASE=firefly\n    volumes:\n      - ${STACK_NAME}_db:/var/lib/mysql\n\
+  \    networks:\n      - internal\n\nvolumes:\n  ${STACK_NAME}_upload:\n  ${STACK_NAME}_db:\n\
+  \nnetworks:\n  internal:"

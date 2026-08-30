@@ -1,0 +1,61 @@
+name: regclient
+category: dev
+description: Docker registry with UI
+variables:
+- name: REG_PORT
+  description: Registry Port
+  default: '5000'
+  required: false
+- name: REG_TAG
+  description: Registry Tag
+  default: latest
+  required: false
+compose: |
+  version: '3.7'
+
+  services:
+    registry:
+      image: registry:${REG_TAG}
+      container_name: ${STACK_NAME}
+      init: true
+      restart: unless-stopped
+      volumes:
+        - ${STACK_NAME}_data:/var/lib/registry
+        - ${STACK_NAME}_config:/etc/docker/registry/config.yml
+        - ${STACK_NAME}_htpasswd:/auth/htpasswd:ro
+      environment:
+        REGISTRY_STORAGE_DELETE_ENABLED: 'true'
+      ports:
+        - "${REG_PORT}:5000"
+      networks:
+        - internal
+
+    registry-ui:
+      container_name: ${STACK_NAME}_ui
+      image: joxit/docker-registry-ui:main
+      restart: always
+      environment:
+        - SINGLE_REGISTRY=true
+        - REGISTRY_TITLE=Atareao Docker Registry
+        - DELETE_IMAGES=true
+        - SHOW_CONTENT_DIGEST=true
+        - NGINX_PROXY_PASS_URL=http://registry:5000
+        - SHOW_CATALOG_NB_TAGS=true
+        - CATALOG_MIN_BRANCHES=1
+        - CATALOG_MAX_BRANCHES=1
+        - TAGLIST_PAGE_SIZE=100
+        - REGISTRY_SECURED=false
+        - CATALOG_ELEMENTS_LIMIT=1000
+      networks:
+        - internal
+        - proxy
+
+  volumes:
+    ${STACK_NAME}_data: {}
+    ${STACK_NAME}_config: {}
+    ${STACK_NAME}_htpasswd: {}
+
+  networks:
+    internal: {}
+    proxy:
+      external: true

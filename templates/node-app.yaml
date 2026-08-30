@@ -1,0 +1,52 @@
+name: node-app
+description: "Node.js application with PM2"
+category: app
+variables:
+  - name: BUILD_CONTEXT
+    description: "Docker build context"
+    default: "."
+    required: false
+  - name: DOCKERFILE
+    description: "Dockerfile name"
+    default: Dockerfile
+    required: false
+  - name: IMAGE_NAME
+    description: "Image name"
+    default: app
+    required: false
+  - name: IMAGE_TAG
+    description: "Image tag"
+    default: latest
+    required: false
+  - name: NODE_ENV
+    description: "Node environment"
+    default: production
+    required: false
+  - name: HOST_PORT
+    description: "Host port"
+    default: "3000"
+    required: false
+  - name: APP_PORT
+    description: "App port"
+    default: "3000"
+    required: false
+  - name: APP_DATA_DIR
+    description: "Data directory"
+    default: "./app/data"
+    required: false
+compose: |
+  services:
+    app:
+      build:
+        context: ${BUILD_CONTEXT:-.}
+        dockerfile: ${DOCKERFILE:-Dockerfile}
+      image: ${IMAGE_NAME:-app}:${IMAGE_TAG:-latest}
+      container_name: ${STACK_NAME}-app
+      environment:
+        NODE_ENV: ${NODE_ENV:-production}
+        PORT: ${APP_PORT:-3000}
+      ports:
+        - "${HOST_PORT:-3000}:${APP_PORT:-3000}"
+      volumes:
+        - ${APP_DATA_DIR:-./app/data}:/app/data
+      restart: unless-stopped

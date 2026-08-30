@@ -1,0 +1,26 @@
+name: codercom
+category: dev
+description: Code Server - VS Code in browser
+variables:
+- name: CODER_PORT
+  description: Coder Port
+  default: '8443'
+  required: false
+- name: CODER_TAG
+  description: Coder Tag
+  default: latest
+  required: false
+- name: PASSWORD
+  description: Password
+  default: change-me
+  required: true
+- name: TZ
+  description: Tz
+  default: Europe/Madrid
+  required: false
+compose: "services:\n  code-server:\n    image: lscr.io/linuxserver/code-server:${CODER_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    environment:\n      - PUID=1000\n      -\
+  \ PGID=1000\n      - TZ=${TZ}\n      - PASSWORD=${PASSWORD}\n    volumes:\n    \
+  \  - ${STACK_NAME}_config:/config\n    restart: unless-stopped\n    ports:\n    \
+  \  - \"${CODER_PORT}:8443\"\n    networks:\n      - proxy\n\nnetworks:\n  proxy:\n\
+  \    external: true"

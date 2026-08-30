@@ -1,0 +1,41 @@
+name: yopass
+category: security
+description: Encrypted secret sharing with Memcached
+variables:
+- name: YOPASS_PORT
+  description: Yopass Port
+  default: '8080'
+  required: false
+- name: YOPASS_TAG
+  description: Yopass Tag
+  default: latest
+  required: false
+compose: |
+  services:
+    memcached:
+      image: memcached
+      container_name: ${STACK_NAME}_memcached
+      init: true
+      restart: unless-stopped
+      networks:
+        - internal
+    yopass:
+      image: jhaals/yopass:${YOPASS_TAG}
+      container_name: ${STACK_NAME}
+      init: true
+      command: --memcached=memcached:11211 --port 80
+      restart: unless-stopped
+      ports:
+        - "${YOPASS_PORT}:80"
+      networks:
+        - internal
+        - proxy
+      labels:
+        - traefik.enable=true
+        - traefik.http.services.yopass.loadbalancer.server.port=80
+        - traefik.http.routers.yopass.rule=Host(`${FQDN}`)
+        - traefik.http.routers.yopass.entrypoints=https
+  networks:
+    internal: {}
+    proxy:
+      external: true

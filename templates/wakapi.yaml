@@ -1,0 +1,56 @@
+name: wakapi
+category: dev
+description: Wakapi - coding statistics server (WakaTime compatible)
+variables:
+- name: WAKA_PORT
+  description: Wakapi web port
+  default: '3000'
+  required: false
+- name: WAKA_TAG
+  description: Wakapi image tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: PostgreSQL password
+  default: change-me
+  required: false
+compose: |
+  services:
+    wakapi:
+      image: ghcr.io/muety/wakapi:${WAKA_TAG}
+      container_name: ${STACK_NAME}
+      init: true
+      restart: unless-stopped
+      environment:
+        WAKAPI_DB_TYPE: postgres
+        WAKAPI_DB_NAME: wakapi
+        WAKAPI_DB_USER: wakapi
+        WAKAPI_DB_PASSWORD: ${DB_PASS}
+        WAKAPI_DB_HOST: db
+        WAKAPI_DB_PORT: "5432"
+        WAKAPI_ALLOW_SIGNUP: false
+      volumes:
+        - ${STACK_NAME}_data:/data
+      networks:
+        - proxy
+        - internal
+    db:
+      image: postgres:17-alpine
+      container_name: ${STACK_NAME}_db
+      init: true
+      restart: unless-stopped
+      environment:
+        POSTGRES_DB: wakapi
+        POSTGRES_USER: wakapi
+        POSTGRES_PASSWORD: ${DB_PASS}
+      volumes:
+        - ${STACK_NAME}_pg_data:/var/lib/postgresql/data
+      networks:
+        - internal
+  volumes:
+    ${STACK_NAME}_data:
+    ${STACK_NAME}_pg_data:
+  networks:
+    internal:
+    proxy:
+      external: true

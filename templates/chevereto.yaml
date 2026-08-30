@@ -1,0 +1,28 @@
+name: chevereto
+category: content
+description: Chevereto image hosting
+variables:
+- name: CHEV_PORT
+  description: Chev Port
+  default: '8080'
+  required: false
+- name: CHEV_TAG
+  description: Chev Tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Db Pass
+  default: change-me
+  required: true
+compose: "services:\n  mariadb:\n    image: mariadb:10\n    container_name: ${STACK_NAME}_db\n\
+  \    restart: always\n    init: true\n    environment:\n      MYSQL_DATABASE: chevereto\n\
+  \      MYSQL_USER: chevereto\n      MYSQL_PASSWORD: ${DB_PASS}\n      MARIADB_ROOT_PASSWORD:\
+  \ ${DB_PASS}\n    volumes:\n      - ${STACK_NAME}_mariadb:/var/lib/mysql\n    networks:\n\
+  \      - internal\n  chevereto:\n    image: ghcr.io/chevereto/chevereto:${CHEV_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n\
+  \    depends_on:\n      - mariadb\n    volumes:\n      - ${STACK_NAME}_images:/var/www/html/images\n\
+  \    environment:\n      CHEVERETO_DB_HOST: mariadb\n      CHEVERETO_DB_USER: chevereto\n\
+  \      CHEVERETO_DB_PASS: ${DB_PASS}\n      CHEVERETO_DB_PORT: 3306\n      CHEVERETO_DB_NAME:\
+  \ chevereto\n      CHEVERETO_ASSET_STORAGE_TYPE: local\n    ports:\n      - \"${CHEV_PORT}:80\"\
+  \n    networks:\n      - internal\n\nvolumes:\n  ${STACK_NAME}_images: {}\n  ${STACK_NAME}_mariadb:\
+  \ {}\n\nnetworks:\n  internal: {}"

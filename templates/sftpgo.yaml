@@ -1,0 +1,23 @@
+name: sftpgo
+category: tools
+description: SFTPGo SFTP server
+variables:
+- name: SFTP_PORT
+  description: Sftp Port
+  default: '8080'
+  required: false
+- name: SFTP_TAG
+  description: Sftp Tag
+  default: latest
+  required: false
+- name: SFTPD_PORT
+  description: Sftpd Port
+  default: '2022'
+  required: false
+compose: "services:\n  sftpgo:\n    image: drakkan/sftpgo:${SFTP_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n    ports:\n      -\
+  \ \"${SFTPD_PORT}:2022\"\n      - \"${SFTP_PORT}:10080\"\n    environment:\n   \
+  \   - SFTPGO_WEBDAV__BINDINGS__0__PORT=10080\n    volumes:\n      - ${STACK_NAME}_data:/srv/sftpgo\n\
+  \      - ${STACK_NAME}_home:/var/lib/sftpgo\n    networks:\n      - proxy\n\nnetworks:\n\
+  \  proxy:\n    external: true\n\nvolumes:\n  ${STACK_NAME}_data: {}\n  ${STACK_NAME}_home:\
+  \ {}"

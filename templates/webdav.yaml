@@ -1,0 +1,22 @@
+name: webdav
+description: "WebDAV - File sharing over WebDAV protocol"
+category: "storage"
+variables:
+  - name: WEBDAV_PORT
+    description: "Puerto para el servicio WebDAV"
+    default: "8080"
+    required: false
+  - name: WEBDAV_TAG
+    description: "Tag de la imagen"
+    default: "latest"
+    required: false
+compose: |
+  services:
+    webdav:
+      image: atareao/nginx-webdav:${WEBDAV_TAG:-latest}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      ports:
+        - ${WEBDAV_PORT:-8080}:80
+      volumes:
+        - ${STACK_NAME}_share:/share

@@ -1,0 +1,21 @@
+name: tinymediamanager
+category: media
+description: TinyMediaManager media manager
+variables:
+- name: TMM_PORT
+  description: Tmm Port
+  default: '8080'
+  required: false
+- name: TMM_TAG
+  description: Tmm Tag
+  default: latest
+  required: false
+- name: TZ
+  description: Tz
+  default: Europe/Madrid
+  required: false
+compose: "services:\n  pdfding:\n    image: mrmn/pdfding:${TMM_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    restart: unless-stopped\n    init: true\n    environment:\n\
+  \      DEFAULT_THEME: dark\n      DEFAULT_THEME_COLOR: blue\n      TZ: ${TZ}\n  \
+  \  volumes:\n      - ${STACK_NAME}_sqlite_data:/home/nonroot/pdfding/db\n      -\
+  \ ${STACK_NAME}_media:/home/nonroot/pdfding/media\n    ports:\n      - \"${TMM_PORT}:8000\""

@@ -1,0 +1,28 @@
+name: picoshare
+category: tools
+description: PicoShare - minimal file sharing server
+variables:
+- name: PICO_PORT
+  description: PicoShare web port
+  default: '3001'
+  required: false
+- name: PICO_TAG
+  description: PicoShare image tag
+  default: latest
+  required: false
+compose: |
+  services:
+    picoshare:
+      image: mtlynch/picoshare:${PICO_TAG}
+      container_name: ${STACK_NAME}
+      init: true
+      restart: unless-stopped
+      environment:
+        - PORT=${PICO_PORT}
+        - PS_SHARED_SECRET=change-me
+      volumes:
+        - ${STACK_NAME}_data:/data
+      ports:
+        - "${PICO_PORT}:${PICO_PORT}"
+  volumes:
+    ${STACK_NAME}_data:

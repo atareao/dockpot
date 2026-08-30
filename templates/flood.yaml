@@ -1,0 +1,52 @@
+name: flood
+description: "Flood + rTorrent - Torrent client with web UI"
+category: "tools"
+variables:
+  - name: FLOOD_PORT
+    description: "Puerto para la interfaz web de Flood"
+    default: "3001"
+    required: false
+  - name: FLOOD_TAG
+    description: "Tag de la imagen de Flood"
+    default: "latest"
+    required: false
+  - name: RTORRENT_PORT
+    description: "Puerto para rTorrent"
+    default: "6881"
+    required: false
+  - name: PUID
+    description: "User ID"
+    default: "1000"
+    required: false
+  - name: PGID
+    description: "Group ID"
+    default: "1000"
+    required: false
+compose: |
+  services:
+    flood:
+      hostname: flood
+      image: jesec/flood:${FLOOD_TAG:-latest}
+      user: ${PUID:-1000}:${PGID:-1000}
+      restart: unless-stopped
+      command: --port ${FLOOD_PORT:-3001} --allowedpath /data
+      environment:
+        HOME: /config
+      volumes:
+        - ${STACK_NAME}_config:/config
+        - ${STACK_NAME}_data:/data
+      ports:
+        - 127.0.0.1:${FLOOD_PORT:-3001}:${FLOOD_PORT:-3001}
+    rtorrent:
+      hostname: rtorrent
+      image: jesec/rtorrent:${FLOOD_TAG:-latest}
+      user: ${PUID:-1000}:${PGID:-1000}
+      restart: unless-stopped
+      command: -o network.port_range.set=${RTORRENT_PORT:-6881}-${RTORRENT_PORT:-6881},system.daemon.set=true
+      environment:
+        HOME: /config
+      volumes:
+        - ${STACK_NAME}_config:/config
+        - ${STACK_NAME}_data:/data
+      ports:
+        - 0.0.0.0:${RTORRENT_PORT:-6881}:${RTORRENT_PORT:-6881}

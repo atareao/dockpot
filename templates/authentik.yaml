@@ -1,0 +1,49 @@
+name: authentik
+category: security
+description: Authentication provider with PostgreSQL and Redis
+variables:
+- name: AUTH_PORT
+  description: Auth Port
+  default: '9000'
+  required: false
+- name: AUTH_TAG
+  description: Auth Tag
+  default: latest
+  required: false
+- name: AUTH_SECRET_KEY
+  description: Auth Secret Key
+  default: change-me
+  required: true
+- name: AUTH_DB_PASS
+  description: Auth Db Pass
+  default: change-me
+  required: true
+compose: "version: '3.7'\n\nservices:\n  postgresql:\n    image: docker.io/library/postgres:12-alpine\n\
+  \    init: true\n    restart: unless-stopped\n    healthcheck:\n      test: [\"\
+  CMD-SHELL\", \"pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}\"]\n      start_period:\
+  \ 20s\n      interval: 30s\n      retries: 5\n      timeout: 5s\n    volumes:\n\
+  \      - ${STACK_NAME}_database:/var/lib/postgresql/data\n    environment:\n   \
+  \   - POSTGRES_PASSWORD=${AUTH_DB_PASS}\n      - POSTGRES_USER=authentik\n     \
+  \ - POSTGRES_DB=authentik\n\n  redis:\n    image: docker.io/library/redis:alpine\n\
+  \    command: --save 60 1 --loglevel warning\n    restart: unless-stopped\n    healthcheck:\n\
+  \      test: [\"CMD-SHELL\", \"redis-cli ping | grep PONG\"]\n      start_period:\
+  \ 20s\n      interval: 30s\n      retries: 5\n      timeout: 3s\n    volumes:\n\
+  \      - ${STACK_NAME}_redis:/data\n\n  server:\n    image: ghcr.io/goauthentik/server:${AUTH_TAG}\n\
+  \    init: true\n    restart: unless-stopped\n    command: server\n    environment:\n\
+  \      AUTHENTIK_REDIS__HOST: redis\n      AUTHENTIK_POSTGRESQL__HOST: postgresql\n\
+  \      AUTHENTIK_POSTGRESQL__USER: authentik\n      AUTHENTIK_POSTGRESQL__NAME:\
+  \ authentik\n      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTH_DB_PASS}\n      AUTHENTIK_SECRET_KEY:\
+  \ ${AUTH_SECRET_KEY}\n    volumes:\n      - ${STACK_NAME}_media:/media\n      -\
+  \ ${STACK_NAME}_custom_templates:/templates\n      - ${STACK_NAME}_geoip:/geoip\n\
+  \    ports:\n      - \"${AUTH_PORT}:9000\"\n    depends_on:\n      - postgresql\n\
+  \      - redis\n\n  worker:\n    image: ghcr.io/goauthentik/server:${AUTH_TAG}\n\
+  \    init: true\n    restart: unless-stopped\n    command: worker\n    environment:\n\
+  \      AUTHENTIK_REDIS__HOST: redis\n      AUTHENTIK_POSTGRESQL__HOST: postgresql\n\
+  \      AUTHENTIK_POSTGRESQL__USER: authentik\n      AUTHENTIK_POSTGRESQL__NAME:\
+  \ authentik\n      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTH_DB_PASS}\n      AUTHENTIK_SECRET_KEY:\
+  \ ${AUTH_SECRET_KEY}\n    user: root\n    volumes:\n      - ${STACK_NAME}_media:/media\n\
+  \      - ${STACK_NAME}_certs:/certs\n      - /var/run/docker.sock:/var/run/docker.sock\n\
+  \      - ${STACK_NAME}_custom_templates:/templates\n      - ${STACK_NAME}_geoip:/geoip\n\
+  \    depends_on:\n      - postgresql\n      - redis\n\nvolumes:\n  ${STACK_NAME}_database:\n\
+  \  ${STACK_NAME}_redis:\n  ${STACK_NAME}_media:\n  ${STACK_NAME}_certs:\n  ${STACK_NAME}_custom_templates:\n\
+  \  ${STACK_NAME}_geoip:"

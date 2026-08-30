@@ -1,0 +1,22 @@
+name: stirling-pdf
+category: tools
+description: PDF manipulation tool
+variables:
+- name: PDF_PORT
+  description: Pdf Port
+  default: '8080'
+  required: false
+- name: PDF_TAG
+  description: Pdf Tag
+  default: latest
+  required: false
+compose: "services:\n  stirlingpdf:\n    container_name: ${STACK_NAME}\n    image:\
+  \ stirlingtools/stirling-pdf:${PDF_TAG}\n    restart: unless-stopped\n    init:\
+  \ true\n    environment:\n      DOCKER_ENABLE_SECURITY: false\n      LANGS: es_ES\n\
+  \    volumes:\n      - ${STACK_NAME}_training_data:/usr/share/tessdata\n      -\
+  \ ${STACK_NAME}_configs:/configs\n      - ${STACK_NAME}_custom_files:/customFiles/\n\
+  \      - ${STACK_NAME}_logs:/logs/\n      - ${STACK_NAME}_pipeline:/pipeline/\n\
+  \    ports:\n      - \"${PDF_PORT}:8080\"\n    networks:\n      - proxy\n\nvolumes:\n\
+  \  ${STACK_NAME}_training_data: {}\n  ${STACK_NAME}_configs: {}\n  ${STACK_NAME}_custom_files:\
+  \ {}\n  ${STACK_NAME}_logs: {}\n  ${STACK_NAME}_pipeline: {}\n\nnetworks:\n  proxy:\n\
+  \    external: true"

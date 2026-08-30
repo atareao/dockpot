@@ -1,0 +1,41 @@
+name: matrix
+category: communication
+description: Matrix server (Conduit + Element)
+variables:
+- name: MATRIX_PORT
+  description: Matrix Port
+  default: '8008'
+  required: false
+- name: MATRIX_TAG
+  description: Matrix Tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Db Pass
+  default: change-me
+  required: true
+compose: "services:\n  element:\n    image: vectorim/element-web:${MATRIX_TAG}\n \
+  \   container_name: ${STACK_NAME}_element\n    restart: unless-stopped\n    configs:\n\
+  \      - source: element\n        target: /app/config.json\n        mode: \"0666\"\
+  \n    networks:\n      - proxy\n\n  conduit:\n    image: matrixconduit/matrix-conduit:${MATRIX_TAG}\n\
+  \    container_name: ${STACK_NAME}_conduit\n    restart: unless-stopped\n    volumes:\n\
+  \      - ${STACK_NAME}_db:/var/lib/matrix-conduit/\n    environment:\n      RUST_BACKTRACE:\
+  \ full\n      CONDUIT_SERVER_NAME: ${FQDN}\n      CONDUIT_DATABASE_PATH: /var/lib/matrix-conduit/\n\
+  \      CONDUIT_DATABASE_BACKEND: rocksdb\n      CONDUIT_PORT: 6167\n      CONDUIT_MAX_REQUEST_SIZE:\
+  \ 20_000_000\n      CONDUIT_ALLOW_REGISTRATION: false\n      CONDUIT_ALLOW_FEDERATION:\
+  \ true\n      CONDUIT_ALLOW_CHECK_FOR_UPDATES: true\n      CONDUIT_TRUSTED_SERVERS:\
+  \ '[\"matrix.org\"]'\n      CONDUIT_ADDRESS: 0.0.0.0\n    ports:\n      - \"${MATRIX_PORT}:6167\"\
+  \n    networks:\n      - proxy\n\nvolumes:\n  ${STACK_NAME}_db: {}\n\nnetworks:\n\
+  \  proxy:\n    external: true\n\nconfigs:\n  element:\n    content: |\n      {\n\
+  \        \"default_server_config\": {\n          \"m.homeserver\": {\n         \
+  \   \"base_url\": \"https://${FQDN}\"\n          },\n          \"m.identity_server\"\
+  : {\n            \"base_url\": \"https://vector.im\"\n          }\n        },\n\
+  \        \"disable_custom_urls\": false,\n        \"disable_guests\": false,\n \
+  \       \"disable_login_language_selector\": false,\n        \"disable_3pid_login\"\
+  : false,\n        \"brand\": \"Element\",\n        \"defaultCountryCode\": \"GB\"\
+  ,\n        \"showLabsSettings\": false,\n        \"features\": {\n          \"feature_pinning\"\
+  : true\n        },\n        \"default_federate\": true,\n        \"default_theme\"\
+  : \"light\",\n        \"roomDirectory\": {\n          \"servers\": [\"matrix.org\"\
+  ]\n        },\n        \"piwik\": false,\n        \"settingDefaults\": {\n     \
+  \     \"breadcrumbs\": true\n        },\n        \"jitsi\": {\n          \"preferredDomain\"\
+  : \"jitsi.riot.im\"\n        }\n      }"

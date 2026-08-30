@@ -1,0 +1,22 @@
+name: focalboard
+category: productivity
+description: Project management with PostgreSQL
+variables:
+- name: FB_PORT
+  description: Fb Port
+  default: '8000'
+  required: false
+- name: FB_TAG
+  description: Fb Tag
+  default: latest
+  required: false
+compose: "version: \"3\"\n\nservices:\n  focalboard:\n    image: mattermost/focalboard:${FB_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    depends_on:\n      - focalboarddb\n    volumes:\n\
+  \      - ./config.json:/opt/focalboard/config.json\n      - ${STACK_NAME}_files:/opt/focalboard/files\n\
+  \    restart: always\n    ports:\n      - \"${FB_PORT}:8000\"\n    networks:\n \
+  \     - internal\n      - proxy\n\n  focalboarddb:\n    image: postgres:latest\n\
+  \    container_name: ${STACK_NAME}_db\n    restart: always\n    volumes:\n     \
+  \ - ${STACK_NAME}_db:/var/lib/postgresql/data\n    environment:\n      - POSTGRES_DB=focalboard\n\
+  \      - POSTGRES_USER=focalboard\n      - POSTGRES_PASSWORD=${FB_DB_PASS:-focalboard}\n\
+  \    networks:\n      - internal\n\nvolumes:\n  ${STACK_NAME}_files: {}\n  ${STACK_NAME}_db:\
+  \ {}\n\nnetworks:\n  internal:\n  proxy:\n    external: true"

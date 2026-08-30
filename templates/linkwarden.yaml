@@ -1,0 +1,74 @@
+name: linkwarden
+description: "Linkwarden"
+category: productivity
+variables:
+  - name: LW_PORT
+    description: "Web UI port"
+    default: "8080"
+    required: false
+  - name: LW_TAG
+    description: "Image tag"
+    default: "latest"
+    required: false
+  - name: DB_PASS
+    description: "Database password"
+    default: "change-me"
+    required: true
+  - name: SECRET_KEY
+    description: "Application secret key"
+    default: "change-me"
+    required: true
+  - name: FQDN
+    description: "Fully qualified domain name"
+    default: "linkwarden.example.com"
+    required: false
+compose: |
+  services:
+    linkwarden:
+      image: clipcascade
+      container_name: linkwarden
+      restart: unless-stopped
+      init: true
+      depends_on:
+        - postgres_for_linkwarden
+      networks:
+        - internal
+        - proxy
+      environment:
+        DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:5432/${POSTGRES_DB}"
+      labels:
+        traefik.enable: "true"
+        traefik.http.services.links.loadbalancer.server.port: "3000"
+        traefik.http.routers.links.entrypoints: "https"
+        traefik.http.routers.links.rule: "Host(`${FQDN}`)"
+  
+    postgres_for_linkwarden:
+      image: postgres:latest
+      container_name: postgres_for_linkwarden
+      restart: unless-stopped
+      environment:
+        POSTGRES_USER: "${POSTGRES_USER}"
+        POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+        POSTGRES_DB: "${POSTGRES_DB}"
+      networks:
+        - internal
+      volumes:
+        - data:/var/lib/postgresql/data
+  
+    meilisearch:
+      image: getmeili/meilisearch:v1.12.8
+      restart: always
+      env_file:
+        - .env
+      volumes:
+        - meili_data:/meili_data
+  
+  volumes:
+    data: {}
+    meili_data: {}
+  
+  networks:
+    internal:
+    proxy:
+      external: true
+  

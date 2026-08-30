@@ -1,0 +1,20 @@
+name: freshrss
+category: content
+description: FreshRSS RSS reader
+variables:
+- name: FRESHRSS_PORT
+  description: Freshrss Port
+  default: '8080'
+  required: false
+- name: FRESHRSS_TAG
+  description: Freshrss Tag
+  default: latest
+  required: false
+- name: TZ
+  description: Tz
+  default: Europe/Madrid
+  required: false
+compose: "services:\n  freshrss:\n    image: freshrss/freshrss:${FRESHRSS_TAG}\n \
+  \   container_name: ${STACK_NAME}\n    restart: unless-stopped\n    volumes:\n \
+  \     - ${STACK_NAME}_data:/var/www/FreshRSS/data\n      - ${STACK_NAME}_extensions:/var/www/FreshRSS/extensions\n\
+  \    environment:\n      - TZ=${TZ}\n    ports:\n      - \"${FRESHRSS_PORT}:80\""

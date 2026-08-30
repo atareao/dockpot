@@ -1,0 +1,50 @@
+name: jellystat
+category: media
+description: Jellystat - Jellyfin usage statistics and monitoring
+variables:
+- name: JSTAT_PORT
+  description: Jellystat web port
+  default: '8080'
+  required: false
+- name: JSTAT_TAG
+  description: Jellystat image tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: PostgreSQL password
+  default: change-me
+  required: false
+compose: |
+  services:
+    jellystat-db:
+      image: postgres:15.2
+      container_name: ${STACK_NAME}_db
+      init: true
+      environment:
+        POSTGRES_DB: jfstat
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: ${DB_PASS}
+      volumes:
+        - ${STACK_NAME}_postgres:/var/lib/postgresql/data
+    jellystat:
+      image: cyfershepard/jellystat:${JSTAT_TAG}
+      container_name: ${STACK_NAME}
+      init: true
+      environment:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: ${DB_PASS}
+        POSTGRES_IP: jellystat-db
+        POSTGRES_PORT: 5432
+        JWT_SECRET: ${DB_PASS}
+      volumes:
+        - ${STACK_NAME}_backup:/app/backend/backup-data
+      depends_on:
+        - jellystat-db
+      networks:
+        - proxy
+  volumes:
+    ${STACK_NAME}_postgres:
+    ${STACK_NAME}_backup:
+  networks:
+    proxy:
+      external: true

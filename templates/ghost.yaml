@@ -1,0 +1,23 @@
+name: ghost
+category: content
+description: Ghost blogging platform
+variables:
+- name: GHOST_PORT
+  description: Ghost Port
+  default: '2368'
+  required: false
+- name: GHOST_TAG
+  description: Ghost Tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Db Pass
+  default: change-me
+  required: true
+- name: TZ
+  description: Tz
+  default: Europe/Madrid
+  required: false
+compose: "services:\n  ghost:\n    image: ghost:${GHOST_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    restart: unless-stopped\n    volumes:\n      - ${STACK_NAME}_blog:/var/lib/ghost/content\n\
+  \    environment:\n      - TZ=${TZ}\n    ports:\n      - \"${GHOST_PORT}:2368\""

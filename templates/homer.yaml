@@ -1,0 +1,16 @@
+name: homer
+category: tools
+description: Homer simple dashboard
+variables:
+- name: HOMER_PORT
+  description: Homer Port
+  default: '8080'
+  required: false
+- name: HOMER_TAG
+  description: Homer Tag
+  default: latest
+  required: false
+compose: "services:\n  homer:\n    image: b4bz/homer:${HOMER_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n    volumes:\n    \
+  \  - ${STACK_NAME}_assets:/www/assets\n    user: 1000:1000\n    environment:\n  \
+  \    INIT_ASSETS: 1\n    ports:\n      - \"${HOMER_PORT}:8080\""

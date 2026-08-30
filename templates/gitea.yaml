@@ -1,0 +1,36 @@
+name: gitea
+category: dev
+description: Git server with PostgreSQL
+variables:
+- name: GITEA_PORT
+  description: Gitea Port
+  default: '3000'
+  required: false
+- name: GITEA_SSH_PORT
+  description: Gitea Ssh Port
+  default: '2222'
+  required: false
+- name: GITEA_TAG
+  description: Gitea Tag
+  default: latest
+  required: false
+compose: "version: \"3.7\"\n\nservices:\n  server:\n    image: gitea/gitea:${GITEA_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    init: true\n    environment:\n      - USER_UID=1000\n\
+  \      - USER_GID=1000\n      - GITEA__database__DB_TYPE=postgres\n      - GITEA__database__HOST=db:5432\n\
+  \      - GITEA__database__NAME=gitea\n      - GITEA__database__USER=gitea\n    \
+  \  - GITEA__database__PASSWD=gitea\n      - GITEA__repository__DEFAULT_BRANCH=main\n\
+  \      - GITEA__repository__ENABLE_PUSH_CREATE_ORG=true\n      - GITEA__server__OFFLINE_MODE=true\n\
+  \      - GITEA__server__DOMAIN=${FQDN}\n      - GITEA__server__SSH_DOMAIN=${FQDN}\n\
+  \      - GITEA__server__ROOT_URL=https://${FQDN}\n      - GITEA__server__DISABLE_SSH=false\n\
+  \      - GITEA__server__SSH_PORT=${GITEA_SSH_PORT}\n      - GITEA__server__SSH_LISTEN_PORT=22\n\
+  \      - GITEA__service__DISABLE_REGISTRATION=true\n      - GITEA__service__REQUIRE_SIGNIN_VIEW=true\n\
+  \      - GITEA__service__DEFAULT_ALLOW_CREATE_ORGANIZATION=false\n    restart: always\n\
+  \    networks:\n      - internal\n      - proxy\n    volumes:\n      - ${STACK_NAME}_data:/data\n\
+  \      - /etc/timezone:/etc/timezone:ro\n      - /etc/localtime:/etc/localtime:ro\n\
+  \    ports:\n      - \"${GITEA_PORT}:3000\"\n      - \"${GITEA_SSH_PORT}:22\"\n\
+  \    depends_on:\n      - db\n\n  db:\n    image: postgres:14\n    restart: always\n\
+  \    environment:\n      - POSTGRES_USER=gitea\n      - POSTGRES_PASSWORD=gitea\n\
+  \      - POSTGRES_DB=gitea\n    networks:\n      - internal\n    volumes:\n    \
+  \  - ${STACK_NAME}_db:/var/lib/postgresql/data\n\nvolumes:\n  ${STACK_NAME}_data:\
+  \ {}\n  ${STACK_NAME}_db: {}\n\nnetworks:\n  internal:\n  proxy:\n    external:\
+  \ true"

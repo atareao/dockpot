@@ -1,0 +1,36 @@
+name: dufs
+category: tools
+description: Dufs - file server with web UI
+variables:
+- name: DUFS_PORT
+  description: Dufs web port
+  default: '5000'
+  required: false
+- name: DUFS_TAG
+  description: Dufs image tag
+  default: latest
+  required: false
+compose: |
+  services:
+    dufs:
+      image: sigoden/dufs:${DUFS_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      init: true
+      volumes:
+        - ${STACK_NAME}_data:/data
+      networks:
+        - proxy
+      environment:
+        DUFS_SERVE_PATH: /data
+        DUFS_ALLOW_ALL: true
+        DUFS_ALLOW_UPLOAD: true
+        DUFS_ALLOW_DELETE: true
+        DUFS_ALLOW_SEARCH: true
+        DUFS_ALLOW_SYMLINK: true
+        DUFS_ALLOW_ARCHIVE: true
+  volumes:
+    ${STACK_NAME}_data:
+  networks:
+    proxy:
+      external: true

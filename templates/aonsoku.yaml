@@ -1,0 +1,20 @@
+name: aonsoku
+description: "Aonsoku - AI-powered file organizer"
+category: "tools"
+variables:
+  - name: AONSOKU_PORT
+    description: "Puerto para la interfaz web"
+    default: "8081"
+    required: false
+  - name: AONSOKU_TAG
+    description: "Tag de la imagen"
+    default: "latest"
+    required: false
+compose: |
+  services:
+    aonsoku:
+      image: ghcr.io/victoralvesf/aonsoku:${AONSOKU_TAG:-latest}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      ports:
+        - ${AONSOKU_PORT:-8081}:8080

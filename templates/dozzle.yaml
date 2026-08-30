@@ -1,0 +1,15 @@
+name: dozzle
+category: monitoring
+description: Dozzle Docker log viewer
+variables:
+- name: DOZZLE_PORT
+  description: Dozzle Port
+  default: '8080'
+  required: false
+- name: DOZZLE_TAG
+  description: Dozzle Tag
+  default: latest
+  required: false
+compose: "services:\n  dozzle:\n    image: amir20/dozzle:${DOZZLE_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    init: true\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock\n\
+  \    ports:\n      - \"${DOZZLE_PORT}:8080\""

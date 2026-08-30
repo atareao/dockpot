@@ -1,0 +1,34 @@
+name: tabby
+description: "Tabby - Self-hosted AI code assistant"
+category: "ai"
+variables:
+  - name: TABBY_PORT
+    description: "HTTP port for the Tabby API"
+    default: "8080"
+    required: false
+  - name: TABBY_MODEL
+    description: "Model to serve (e.g. StarCoder2-3B, Qwen2.5-Coder-7B)"
+    default: "StarCoder2-3B"
+    required: false
+  - name: TABBY_TAG
+    description: "Tabby image tag"
+    default: "latest"
+    required: false
+  - name: TABBY_TOKEN
+    description: "Admin token (generate with: openssl rand -hex 32)"
+    default: ""
+    required: true
+compose: |
+  services:
+    tabby:
+      image: tabbyml/tabby:${TABBY_TAG}
+      container_name: ${STACK_NAME}
+      restart: always
+      init: true
+      command: serve --model ${TABBY_MODEL} --device cpu
+      ports:
+        - ${TABBY_PORT}:8080
+      volumes:
+        - ${STACK_NAME}_data:/data
+      environment:
+        - TABBY_ADMIN_TOKEN=${TABBY_TOKEN}

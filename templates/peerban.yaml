@@ -1,0 +1,17 @@
+name: peerban
+category: media
+description: SimpleTorrent file sharing
+variables:
+- name: TORRENT_PORT
+  description: Torrent Port
+  default: '3000'
+  required: false
+- name: TORRENT_TAG
+  description: Torrent Tag
+  default: latest
+  required: false
+compose: "services:\n  simpletorrent:\n    image: boypt/cloud-torrent:${TORRENT_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n\
+  \    ports:\n      - \"${TORRENT_PORT}:50012\"\n      - \"50012:50012/udp\"\n   \
+  \ environment:\n      AUTH: \"username:password\"\n      TITLE: \"MySimpleTorrent\"\n\
+  \    volumes:\n      - ${STACK_NAME}_downloads:/srv/downloads"

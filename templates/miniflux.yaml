@@ -1,0 +1,35 @@
+name: miniflux
+category: content
+description: Miniflux minimalist RSS reader with PostgreSQL
+variables:
+- name: MF_PORT
+  description: Mf Port
+  default: '8080'
+  required: false
+- name: MF_TAG
+  description: Mf Tag
+  default: latest
+  required: false
+- name: MF_DB_PASS
+  description: Mf Db Pass
+  default: change-me
+  required: true
+- name: MF_ADMIN_USER
+  description: Mf Admin User
+  default: admin
+  required: false
+- name: MF_ADMIN_PASS
+  description: Mf Admin Pass
+  default: admin123
+  required: true
+compose: "services:\n  miniflux:\n    image: miniflux/miniflux:${MF_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    restart: unless-stopped\n    init: true\n    depends_on:\n\
+  \      miniflux_db:\n        condition: service_healthy\n    environment:\n    \
+  \  DATABASE_URL: postgres://miniflux:${MF_DB_PASS}@miniflux_db/miniflux?sslmode=disable\n\
+  \      RUN_MIGRATIONS: \"1\"\n      CREATE_ADMIN: \"1\"\n      ADMIN_USERNAME: ${MF_ADMIN_USER}\n\
+  \      ADMIN_PASSWORD: ${MF_ADMIN_PASS}\n    ports:\n      - \"${MF_PORT}:8080\"\
+  \n  miniflux_db:\n    image: postgres:18-alpine\n    container_name: ${STACK_NAME}_db\n\
+  \    restart: unless-stopped\n    init: true\n    environment:\n      - POSTGRES_USER=miniflux\n\
+  \      - POSTGRES_PASSWORD=${MF_DB_PASS}\n    volumes:\n      - ${STACK_NAME}_database:/var/lib/postgresql/data\n\
+  \    healthcheck:\n      test: [\"CMD\", \"pg_isready\", \"-U\", \"miniflux\"]\n\
+  \      interval: 30s\n      start_period: 30s"

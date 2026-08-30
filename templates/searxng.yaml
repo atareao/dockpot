@@ -1,0 +1,18 @@
+name: searxng
+category: tools
+description: SearXNG private search engine
+variables:
+- name: SEARXNG_PORT
+  description: Searxng Port
+  default: '8080'
+  required: false
+- name: SEARXNG_TAG
+  description: Searxng Tag
+  default: latest
+  required: false
+compose: "services:\n  searxng:\n    image: searxng/searxng:${SEARXNG_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n    volumes:\n   \
+  \   - ${STACK_NAME}_config:/etc/searxng:rw\n    ports:\n      - \"${SEARXNG_PORT}:8080\"\
+  \n  redis:\n    image: redis:alpine\n    container_name: ${STACK_NAME}_redis\n \
+  \   init: true\n    command: redis-server --save \"\" --appendonly \"no\"\n    tmpfs:\n\
+  \      - /var/lib/redis"

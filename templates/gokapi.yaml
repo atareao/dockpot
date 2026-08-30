@@ -1,0 +1,32 @@
+name: gokapi
+category: tools
+description: Gokapi - lightweight file sharing server
+variables:
+- name: GOKAPI_PORT
+  description: Gokapi web port
+  default: '53842'
+  required: false
+- name: GOKAPI_TAG
+  description: Gokapi image tag
+  default: latest
+  required: false
+compose: |
+  services:
+    gokapi:
+      image: f0rc3/gokapi:${GOKAPI_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      volumes:
+        - ${STACK_NAME}_config:/app/config
+        - ${STACK_NAME}_data:/app/data
+      networks:
+        - proxy
+      environment:
+        GOKAPI_PORT: ${GOKAPI_PORT}
+        GOKAPI_EXTERNAL_URL: https://${FQDN}
+  volumes:
+    ${STACK_NAME}_config:
+    ${STACK_NAME}_data:
+  networks:
+    proxy:
+      external: true

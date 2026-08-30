@@ -1,0 +1,16 @@
+name: homepage
+category: tools
+description: Homepage dashboard
+variables:
+- name: HP_PORT
+  description: Hp Port
+  default: '3000'
+  required: false
+- name: HP_TAG
+  description: Hp Tag
+  default: latest
+  required: false
+compose: "services:\n  homepage:\n    image: ghcr.io/benphelps/homepage:${HP_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n\
+  \    volumes:\n      - ${STACK_NAME}_config:/app/config\n      - /var/run/docker.sock:/var/run/docker.sock:ro\n\
+  \    ports:\n      - \"${HP_PORT}:3000\""

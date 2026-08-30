@@ -1,0 +1,16 @@
+name: wallabag
+category: content
+description: Wallabag read-it-later service
+variables:
+- name: WB_PORT
+  description: Wb Port
+  default: '8080'
+  required: false
+- name: WB_TAG
+  description: Wb Tag
+  default: latest
+  required: false
+compose: "services:\n  wallabag:\n    image: wallabag/wallabag:${WB_TAG}\n    init:\
+  \ true\n    container_name: ${STACK_NAME}\n    volumes:\n      - ${STACK_NAME}_images:/var/www/wallabag/web/assets/images\n\
+  \      - ${STACK_NAME}_data:/var/www/wallabag/data\n    restart: unless-stopped\n\
+  \    ports:\n      - \"${WB_PORT}:80\""

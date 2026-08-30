@@ -1,0 +1,42 @@
+name: postgres
+description: "PostgreSQL database server"
+category: database
+variables:
+  - name: POSTGRES_TAG
+    description: "PostgreSQL image tag"
+    default: "16-alpine"
+    required: false
+  - name: POSTGRES_DB
+    description: "Database name"
+    default: app
+    required: false
+  - name: POSTGRES_USER
+    description: "Database user"
+    default: app
+    required: false
+  - name: POSTGRES_PASSWORD
+    description: "Database password"
+    default: ""
+    required: true
+  - name: POSTGRES_PORT
+    description: "Port"
+    default: "5432"
+    required: false
+  - name: POSTGRES_DATA_DIR
+    description: "Data directory"
+    default: "./postgres/data"
+    required: false
+compose: |
+  services:
+    postgres:
+      image: postgres:${POSTGRES_TAG:-16-alpine}
+      container_name: ${STACK_NAME}-postgres
+      environment:
+        POSTGRES_DB: ${POSTGRES_DB:-app}
+        POSTGRES_USER: ${POSTGRES_USER:-app}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ports:
+        - "${POSTGRES_PORT:-5432}:5432"
+      volumes:
+        - ${POSTGRES_DATA_DIR:-./postgres/data}:/var/lib/postgresql/data
+      restart: unless-stopped

@@ -1,0 +1,16 @@
+name: flame
+category: tools
+description: Flame dashboard/startpage
+variables:
+- name: FLAME_PORT
+  description: Flame Port
+  default: '5005'
+  required: false
+- name: FLAME_TAG
+  description: Flame Tag
+  default: latest
+  required: false
+compose: "services:\n  flame:\n    image: pawelmalak/flame:${FLAME_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n    volumes:\n    \
+  \  - ${STACK_NAME}_data:/app/data\n      - /var/run/docker.sock:/var/run/docker.sock\n\
+  \    ports:\n      - \"${FLAME_PORT}:5005\""

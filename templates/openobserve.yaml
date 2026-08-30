@@ -1,0 +1,54 @@
+name: openobserve
+category: monitoring
+description: Observability platform
+variables:
+- name: O2_PORT
+  description: OpenObserve Port
+  default: '5080'
+  required: false
+- name: O2_TAG
+  description: OpenObserve Tag
+  default: latest
+  required: false
+- name: ZINC_ADMIN_USER
+  description: Admin User
+  default: admin
+  required: false
+- name: ZINC_ADMIN_PASS
+  description: Admin Password
+  default: change-me
+  required: true
+compose: |
+  services:
+    openobserve:
+      image: public.ecr.aws/zinclabs/openobserve:${O2_TAG}
+      container_name: ${STACK_NAME}
+      restart: always
+      environment:
+        RUST_LOG: warn
+        ZO_ROOT_USER_EMAIL: ${ZINC_ADMIN_USER}
+        ZO_ROOT_USER_PASSWORD: ${ZINC_ADMIN_PASS}
+        ZO_COMPACT_DATA_RETENTION_DAYS: 30
+        ZO_DATA_DIR: /data
+      volumes:
+        - ${STACK_NAME}_data:/data
+      ports:
+        - "${O2_PORT}:5080"
+      networks:
+        - proxy
+        - networklog
+        - hookbridge
+      labels:
+        traefik.enable: true
+        traefik.http.services.dockerobserve.loadbalancer.server.port: 5080
+        traefik.http.routers.dockerobserve.entrypoints: https
+        traefik.http.routers.dockerobserve.rule: Host(`${FQDN}`)
+  volumes:
+    ${STACK_NAME}_data: {}
+  networks:
+    networklog:
+      external: true
+    proxy:
+      external: true
+    hookbridge:
+      external: true

@@ -1,0 +1,36 @@
+name: phpmyadmin
+category: dev
+description: MySQL web admin interface
+variables:
+- name: PMA_PORT
+  description: PhpMyAdmin Port
+  default: '8080'
+  required: false
+- name: PMA_TAG
+  description: PhpMyAdmin Tag
+  default: latest
+  required: false
+compose: |
+  version: "3.7"
+
+  services:
+    myadmin:
+      image: phpmyadmin:${PMA_TAG}
+      container_name: ${STACK_NAME}
+      restart: always
+      ports:
+        - "${PMA_PORT}:80"
+      networks:
+        - proxy
+        - wp
+      labels:
+        - caddy="${FQDN}"
+        - caddy.reverse_proxy="{{upstreams 80}}"
+      environment:
+        - PMA_ARBITRARY=1
+
+  networks:
+    proxy:
+      external: true
+    wp:
+      external: true

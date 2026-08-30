@@ -1,0 +1,27 @@
+name: trilium
+category: productivity
+description: Trilium - hierarchical note-taking application
+variables:
+- name: TRILIUM_PORT
+  description: Trilium web port
+  default: '8080'
+  required: false
+- name: TRILIUM_TAG
+  description: Trilium image tag
+  default: latest
+  required: false
+compose: |
+  services:
+    trilium:
+      image: zadam/trilium:${TRILIUM_TAG}
+      container_name: ${STACK_NAME}
+      init: true
+      restart: unless-stopped
+      environment:
+        - TRILIUM_DATA_DIR=/home/node/trilium-data
+      volumes:
+        - ${STACK_NAME}_data:/home/node/trilium-data
+      ports:
+        - "${TRILIUM_PORT}:8080"
+  volumes:
+    ${STACK_NAME}_data:

@@ -1,0 +1,28 @@
+name: cloudbeaver
+category: dev
+description: Database administration UI
+variables:
+- name: CB_PORT
+  description: CloudBeaver Port
+  default: '8978'
+  required: false
+- name: CB_TAG
+  description: CloudBeaver Tag
+  default: latest
+  required: false
+compose: |
+  version: "3.7"
+
+  services:
+    cloudbeaver:
+      image: dbeaver/cloudbeaver:${CB_TAG}
+      container_name: ${STACK_NAME}
+      init: true
+      restart: unless-stopped
+      ports:
+        - "${CB_PORT}:8978"
+      volumes:
+        - ${STACK_NAME}_workspace:/opt/cloudbeaver/workspace
+
+  volumes:
+    ${STACK_NAME}_workspace: {}

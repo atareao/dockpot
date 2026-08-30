@@ -1,0 +1,30 @@
+name: wordpress
+category: content
+description: WordPress CMS
+variables:
+- name: WP_PORT
+  description: Wp Port
+  default: '8080'
+  required: false
+- name: WP_TAG
+  description: Wp Tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Db Pass
+  default: change-me
+  required: true
+- name: TZ
+  description: Tz
+  default: Europe/Madrid
+  required: false
+compose: "services:\n  wordpress:\n    image: wordpress:${WP_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    restart: unless-stopped\n    init: true\n    depends_on:\n \
+  \     - mariadb\n    volumes:\n      - ${STACK_NAME}_wp:/var/www/html\n    environment:\n\
+  \      WORDPRESS_DB_HOST: mariadb\n      WORDPRESS_DB_USER: wordpress\n      WORDPRESS_DB_PASSWORD:\
+  \ ${DB_PASS}\n      WORDPRESS_DB_NAME: wordpress\n      TZ: ${TZ}\n  mariadb:\n\
+  \    image: mariadb:10\n    container_name: ${STACK_NAME}_db\n    restart: unless-stopped\n\
+  \    init: true\n    volumes:\n      - ${STACK_NAME}_mariadb:/var/lib/mysql\n   \
+  \ environment:\n      MYSQL_DATABASE: wordpress\n      MYSQL_USER: wordpress\n \
+  \     MYSQL_PASSWORD: ${DB_PASS}\n      MYSQL_ROOT_PASSWORD: ${DB_PASS}\n    ports:\n\
+  \      - \"${WP_PORT}:80\""

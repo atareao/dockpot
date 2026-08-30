@@ -1,0 +1,28 @@
+name: portainer
+description: "Portainer Docker management UI"
+category: management
+variables:
+  - name: PORTAINER_TAG
+    description: "Portainer image tag"
+    default: latest
+    required: false
+  - name: PORTAINER_PORT
+    description: "Web UI port"
+    default: "9000"
+    required: false
+  - name: PORTAINER_DATA
+    description: "Data directory"
+    default: "./portainer/data"
+    required: false
+compose: |
+  services:
+    portainer:
+      image: portainer/portainer-ce:${PORTAINER_TAG:-latest}
+      container_name: ${STACK_NAME}-portainer
+      command: -H unix:///var/run/docker.sock
+      ports:
+        - "${PORTAINER_PORT:-9000}:9000"
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock:ro
+        - ${PORTAINER_DATA:-./portainer/data}:/data
+      restart: unless-stopped

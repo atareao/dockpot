@@ -1,0 +1,21 @@
+name: beszel
+category: monitoring
+description: Beszel server monitoring with agent
+variables:
+- name: BESZEL_PORT
+  description: Beszel Port
+  default: '8090'
+  required: false
+- name: BESZEL_TAG
+  description: Beszel Tag
+  default: latest
+  required: false
+compose: "services:\n  beszel:\n    image: henrygd/beszel:${BESZEL_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    restart: unless-stopped\n    init: true\n    volumes:\n   \
+  \   - ${STACK_NAME}_data:/beszel_data\n      - ${STACK_NAME}_socket:/beszel_socket\n\
+  \    environment:\n      - DISABLE_PASSWORD_AUTH=true\n    ports:\n      - \"${BESZEL_PORT}:8090\"\
+  \n  beszel-agent:\n    image: henrygd/beszel-agent:${BESZEL_TAG}\n    container_name:\
+  \ ${STACK_NAME}_agent\n    restart: unless-stopped\n    init: true\n    volumes:\n\
+  \      - ${STACK_NAME}_agent_data:/var/lib/beszel-agent\n      - ${STACK_NAME}_socket:/beszel_socket\n\
+  \      - /var/run/docker.sock:/var/run/docker.sock:ro\n    environment:\n      LISTEN:\
+  \ /beszel_socket/beszel.sock\n      KEY: change-me\n      HUB_URL: http://beszel:8090"

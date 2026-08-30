@@ -1,0 +1,64 @@
+name: postgres14
+description: "Postgres14"
+category: database
+variables:
+  - name: PG_PORT
+    description: "Database port"
+    default: "5432"
+    required: false
+  - name: PG_TAG
+    description: "Image tag"
+    default: "16-alpine"
+    required: false
+  - name: PG_USER
+    description: "Database user"
+    default: "app"
+    required: false
+  - name: PG_PASS
+    description: "Database password"
+    default: "change-me"
+    required: true
+  - name: PG_DB
+    description: "Database name"
+    default: "app"
+    required: false
+compose: |
+  version: '3.8'
+  
+  services:
+    postgres:
+      container_name: postgres
+      image: postgres:latest
+      restart: always
+      environment:
+        - POSTGRES_USER
+        - POSTGRES_PASSWORD
+        - POSTGRES_DB
+      volumes:
+        - postgres_data:/var/lib/postgresql/data
+      logging:
+        driver: journald
+      networks:
+        - internal
+  
+    pgadmin:
+      container_name: pgadmin4
+      image: dpage/pgadmin4
+      restart: always
+      environment:
+        - PGADMIN_DEFAULT_EMAIL
+        - PGADMIN_DEFAULT_PASSWORD
+      volumes:
+        - pgadmin:/var/lib/pgadmin
+      logging:
+        driver: journald
+      networks:
+        - internal
+  
+  volumes:
+    postgres_data: {}
+    pgadmin: {}
+  
+  networks:
+    internal:
+  

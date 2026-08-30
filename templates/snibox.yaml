@@ -1,0 +1,70 @@
+name: snibox
+category: dev
+description: Code snippets manager with PostgreSQL
+variables:
+- name: SNIBOX_PORT
+  description: Snibox Port
+  default: '8080'
+  required: false
+- name: SNIBOX_TAG
+  description: Snibox Tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Database Password
+  default: change-me
+  required: false
+compose: |
+  version: '3.7'
+
+  services:
+    snibox-nginx:
+      image: snibox/nginx-puma:1.15.9
+      container_name: ${STACK_NAME}_nginx
+      init: true
+      volumes:
+        - ${STACK_NAME}_static:/var/www/html
+      depends_on:
+        - backend
+      networks:
+        - internal
+      ports:
+        - "${SNIBOX_PORT}:80"
+
+    backend:
+      image: snibox/snibox:${SNIBOX_TAG}
+      container_name: ${STACK_NAME}_backend
+      init: true
+      command: sh -c "rm -rf tmp/pids && ./bin/rails s -p 3000 -b '0.0.0.0'"
+      environment:
+        DB_NAME: snibox
+        DB_USER: snibox
+        DB_PASS: ${DB_PASS}
+        DB_HOST: database
+        DB_PORT: "5432"
+      volumes:
+        - ${STACK_NAME}_static:/app/public
+      depends_on:
+        - database
+      networks:
+        - internal
+
+    database:
+      image: postgres:10.7-alpine
+      container_name: ${STACK_NAME}_db
+      init: true
+      environment:
+        POSTGRES_USER: snibox
+        POSTGRES_PASSWORD: ${DB_PASS}
+        POSTGRES_DB: snibox
+      volumes:
+        - ${STACK_NAME}_pg_data:/var/lib/postgresql/data
+      networks:
+        - internal
+
+  volumes:
+    ${STACK_NAME}_pg_data:
+    ${STACK_NAME}_static:
+
+  networks:
+    internal:

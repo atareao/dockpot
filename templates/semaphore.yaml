@@ -1,0 +1,24 @@
+name: semaphore
+category: dev
+description: Ansible UI
+variables:
+- name: SEM_PORT
+  description: Sem Port
+  default: '3000'
+  required: false
+- name: SEM_TAG
+  description: Sem Tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Db Pass
+  default: change-me
+  required: true
+compose: "version: '3.7'\n\nservices:\n  semaphore:\n    image: semaphoreui/semaphore:${SEM_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n\
+  \    ports:\n      - \"${SEM_PORT}:3000\"\n    environment:\n      - SEMAPHORE_DB_DIALECT=bolt\n\
+  \      - SEMAPHORE_ADMIN=admin\n      - SEMAPHORE_ADMIN_PASSWORD=${DB_PASS}\n  \
+  \    - SEMAPHORE_ADMIN_NAME=Admin\n      - SEMAPHORE_ADMIN_EMAIL=admin@${FQDN}\n\
+  \    volumes:\n      - ${STACK_NAME}_config:/etc/semaphore\n      - ${STACK_NAME}_data:/var/lib/semaphore\n\
+  \    networks:\n      - proxy\n\nvolumes:\n  ${STACK_NAME}_config: {}\n  ${STACK_NAME}_data:\
+  \ {}\n\nnetworks:\n  proxy:\n    external: true"

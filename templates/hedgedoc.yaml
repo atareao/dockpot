@@ -1,0 +1,31 @@
+name: hedgedoc
+category: content
+description: HedgeDoc collaborative markdown editor
+variables:
+- name: HD_PORT
+  description: Hd Port
+  default: '3000'
+  required: false
+- name: HD_TAG
+  description: Hd Tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Db Pass
+  default: change-me
+  required: true
+compose: "services:\n  mariadb:\n    image: lscr.io/linuxserver/mariadb:latest\n \
+  \   container_name: ${STACK_NAME}_db\n    restart: always\n    volumes:\n      -\
+  \ ${STACK_NAME}_database:/config\n    environment:\n      MYSQL_ROOT_PASSWORD: ${DB_PASS}\n\
+  \      MYSQL_DATABASE: hedgedoc\n      MYSQL_USER: hedgedoc\n      MYSQL_PASSWORD:\
+  \ ${DB_PASS}\n      PGID: 1000\n      PUID: 1000\n      TZ: Europe/Madrid\n    networks:\n\
+  \      - internal\n  hedgedoc:\n    image: lscr.io/linuxserver/hedgedoc:${HD_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    restart: always\n    depends_on:\n      -\
+  \ mariadb\n    volumes:\n      - ${STACK_NAME}_config:/config\n    environment:\n\
+  \      DB_HOST: mariadb\n      DB_USER: hedgedoc\n      DB_PASS: ${DB_PASS}\n   \
+  \   DB_NAME: hedgedoc\n      DB_PORT: 3306\n      PGID: 1000\n      PUID: 1000\n\
+  \      TZ: Europe/Madrid\n      CMD_DOMAIN: localhost\n      CMD_URL_ADDPORT: \"\
+  true\"\n      CMD_PROTOCOL_USESSL: \"false\"\n      CMD_PORT: \"3000\"\n    ports:\n\
+  \      - \"${HD_PORT}:3000\"\n    networks:\n      - internal\n      - proxy\n\n\
+  volumes:\n  ${STACK_NAME}_database: {}\n  ${STACK_NAME}_config: {}\n\nnetworks:\n\
+  \  internal:\n  proxy:\n    external: true"

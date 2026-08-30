@@ -1,0 +1,37 @@
+name: mongodb
+description: "MongoDB document database"
+category: database
+variables:
+  - name: MONGO_TAG
+    description: "MongoDB image tag"
+    default: "7"
+    required: false
+  - name: MONGO_USER
+    description: "Admin username"
+    default: admin
+    required: false
+  - name: MONGO_PASSWORD
+    description: "Admin password"
+    default: ""
+    required: true
+  - name: MONGO_PORT
+    description: "Port"
+    default: "27017"
+    required: false
+  - name: MONGO_DATA_DIR
+    description: "Data directory"
+    default: "./mongodb/data"
+    required: false
+compose: |
+  services:
+    mongodb:
+      image: mongo:${MONGO_TAG:-7}
+      container_name: ${STACK_NAME}-mongodb
+      environment:
+        MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+        MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      ports:
+        - "${MONGO_PORT:-27017}:27017"
+      volumes:
+        - ${MONGO_DATA_DIR:-./mongodb/data}:/data/db
+      restart: unless-stopped

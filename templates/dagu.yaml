@@ -1,0 +1,31 @@
+name: dagu
+category: dev
+description: Dagu - DAG/task runner with web UI
+variables:
+- name: DAGU_PORT
+  description: Dagu web UI port
+  default: '8080'
+  required: false
+- name: DAGU_TAG
+  description: Dagu image tag
+  default: latest
+  required: false
+compose: |
+  services:
+    dagu:
+      image: ghcr.io/dagu-org/dagu:${DAGU_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      init: true
+      command: dagu start-all
+      environment:
+        DAGU_TZ: Europe/Madrid
+        DAGU_BASE_PATH: /dagu
+        DAGU_IS_BASICAUTH: 1
+        DAGU_BASICAUTH_USERNAME: admin
+        DAGU_BASICAUTH_PASSWORD: ${DAGU_PORT}
+      networks:
+        - proxy
+  networks:
+    proxy:
+      external: true

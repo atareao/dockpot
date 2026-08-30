@@ -1,0 +1,21 @@
+name: logseq
+category: productivity
+description: Logseq - knowledge base and note-taking with local-first approach
+variables:
+- name: LOGSEQ_PORT
+  description: Logseq web port
+  default: '3000'
+  required: false
+- name: LOGSEQ_TAG
+  description: Logseq image tag
+  default: latest
+  required: false
+compose: |
+  services:
+    logseq:
+      image: ghcr.io/logseq/logseq-webapp:${LOGSEQ_TAG}
+      container_name: ${STACK_NAME}
+      init: true
+      restart: unless-stopped
+      ports:
+        - "${LOGSEQ_PORT}:80"

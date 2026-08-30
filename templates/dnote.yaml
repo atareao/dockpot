@@ -1,0 +1,52 @@
+name: dnote
+category: productivity
+description: Dnote - note taking with CLI and web UI
+variables:
+- name: DNOTE_PORT
+  description: Dnote web port
+  default: '8080'
+  required: false
+- name: DNOTE_TAG
+  description: Dnote image tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: PostgreSQL password
+  default: change-me
+  required: false
+compose: |
+  services:
+    postgres:
+      image: postgres:11-alpine
+      container_name: ${STACK_NAME}_db
+      environment:
+        POSTGRES_USER: dnote
+        POSTGRES_PASSWORD: ${DB_PASS}
+        POSTGRES_DB: dnote
+      networks:
+        - internal
+      volumes:
+        - ${STACK_NAME}_data:/var/lib/postgresql/data
+      restart: always
+    dnote:
+      image: dnote/dnote:${DNOTE_TAG}
+      container_name: ${STACK_NAME}
+      environment:
+        GO_ENV: PRODUCTION
+        DBSkipSSL: "true"
+        DBHost: postgres
+        DBPort: 5432
+        DBName: dnote
+        DBUser: dnote
+        DBPassword: ${DB_PASS}
+        OnPremise: "true"
+        DisableRegistration: "false"
+      depends_on:
+        - postgres
+      restart: always
+      networks:
+        - internal
+  volumes:
+    ${STACK_NAME}_data:
+  networks:
+    internal:

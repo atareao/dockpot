@@ -1,0 +1,14 @@
+name: gotty
+category: tools
+description: GoTTY terminal in browser
+variables:
+- name: GOTTY_PORT
+  description: Gotty Port
+  default: '3000'
+  required: false
+- name: GOTTY_TAG
+  description: Gotty Tag
+  default: latest
+  required: false
+compose: "services:\n  gotty:\n    image: atareao/gotty:${GOTTY_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    ports:\n      - \"${GOTTY_PORT}:3000\""

@@ -1,0 +1,36 @@
+name: plausible
+category: analytics
+description: Plausible web analytics
+variables:
+- name: PLAUSIBLE_PORT
+  description: Plausible Port
+  default: '8000'
+  required: false
+- name: PLAUSIBLE_TAG
+  description: Plausible Tag
+  default: latest
+  required: false
+- name: SECRET_KEY
+  description: Secret Key
+  default: change-me
+  required: true
+- name: DB_PASS
+  description: Db Pass
+  default: change-me
+  required: true
+compose: "services:\n  mail:\n    image: bytemark/smtp\n    restart: always\n    networks:\n\
+  \      - internal\n  plausible_db:\n    image: postgres:12\n    restart: always\n\
+  \    volumes:\n      - ${STACK_NAME}_db_data:/var/lib/postgresql/data\n    environment:\n\
+  \      - POSTGRES_PASSWORD=${DB_PASS}\n    networks:\n      - internal\n  plausible_events_db:\n\
+  \    image: yandex/clickhouse-server:21.3.2.5\n    restart: always\n    volumes:\n\
+  \      - ${STACK_NAME}_event_data:/var/lib/clickhouse\n    ulimits:\n      nofile:\n\
+  \        soft: 262144\n        hard: 262144\n    networks:\n      - internal\n  plausible:\n\
+  \    image: plausible/analytics:${PLAUSIBLE_TAG}\n    container_name: ${STACK_NAME}\n\
+  \    restart: always\n    command: sh -c \"sleep 10 && /entrypoint.sh db createdb\
+  \ && /entrypoint.sh db migrate && /entrypoint.sh run\"\n    depends_on:\n      -\
+  \ plausible_db\n      - plausible_events_db\n      - mail\n    environment:\n   \
+  \   - BASE_URL=http://localhost:${PLAUSIBLE_PORT}\n      - SECRET_KEY_BASE=${SECRET_KEY}\n\
+  \      - TZ=Europe/Madrid\n    ports:\n      - \"${PLAUSIBLE_PORT}:8000\"\n    networks:\n\
+  \      - proxy\n      - internal\n\nvolumes:\n  ${STACK_NAME}_db_data:\n    driver:\
+  \ local\n  ${STACK_NAME}_event_data:\n    driver: local\n\nnetworks:\n  internal:\n\
+  \  proxy:\n    external: true"

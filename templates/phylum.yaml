@@ -1,0 +1,81 @@
+name: phylum
+description: "Phylum"
+category: dev
+variables:
+  - name: PHYLUM_PORT
+    description: "Web UI port"
+    default: "8080"
+    required: false
+  - name: PHYLUM_TAG
+    description: "Image tag"
+    default: "latest"
+    required: false
+  - name: FQDN
+    description: "Fully qualified domain name"
+    default: "phylum.example.com"
+    required: false
+  - name: PHYLUM_DB_NAME
+    description: "Database name"
+    default: "phylum"
+    required: false
+  - name: PHYLUM_DB_USER
+    description: "Database user"
+    default: "phylum"
+    required: false
+  - name: PHYLUM_DB_PASSWORD
+    description: "Database password"
+    default: "change-me"
+    required: true
+compose: |
+  services:
+    server:
+      container_name: phylum
+      image: shroff12/phylum
+      restart: unless-stopped
+      volumes:
+        - storage:/app/storage
+      env_file:
+        - .env
+      environment:
+        PHYLUM_DB_HOST: db
+      depends_on:
+        db:
+          condition: service_healthy
+      networks:
+        - internal
+        - proxy
+      labels:
+        traefik.enable: "true"
+        traefik.http.services.phylum.loadbalancer.server.port: "2448"
+        traefik.http.routers.phylum.entrypoints: "https"
+        traefik.http.routers.phylum.rule: "Host(`${FQDN}`)"
+  
+  
+    db:
+      container_name: phylum_db
+      image: postgres:17-alpine
+      restart: unless-stopped
+      init: true
+      environment:
+        POSTGRES_DB: ${PHYLUM_DB_NAME}
+        POSTGRES_USER: ${PHYLUM_DB_USER}
+        POSTGRES_PASSWORD: ${PHYLUM_DB_PASSWORD}
+      volumes:
+        - data:/var/lib/postgresql/data
+      healthcheck:
+        test: "pg_isready -U ${PHYLUM_DB_USER} -d ${PHYLUM_DB_PASSWORD}"
+        interval: 30s
+        timeout: 5s
+        retries: 3
+        start_period: 5s
+      networks:
+        - internal
+  
+  volumes:
+    storage: {}
+    data: {}
+  networks:
+    internal: {}
+    proxy:
+      external: true
+  

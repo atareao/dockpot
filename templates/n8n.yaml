@@ -1,0 +1,18 @@
+name: n8n
+category: dev
+description: Workflow automation
+variables:
+- name: N8N_PORT
+  description: N8N Port
+  default: '5678'
+  required: false
+- name: N8N_TAG
+  description: N8N Tag
+  default: latest
+  required: false
+compose: "version: \"3.7\"\n\nservices:\n  n8n:\n    image: n8nio/n8n:${N8N_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    restart: always\n    init: true\n    ports:\n\
+  \      - \"${N8N_PORT}:5678\"\n    volumes:\n      - ${STACK_NAME}_data:/home/node/.n8n\n\
+  \    environment:\n      - N8N_HOST=${FQDN}\n      - N8N_PORT=5678\n      - N8N_PROTOCOL=https\n\
+  \    networks:\n      - proxy\n\nvolumes:\n  ${STACK_NAME}_data: {}\n\nnetworks:\n\
+  \  proxy:\n    external: true"

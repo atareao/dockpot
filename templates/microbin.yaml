@@ -1,0 +1,28 @@
+name: microbin
+category: tools
+description: Microbin - lightweight pastebin with encryption and file sharing
+variables:
+- name: MBIN_PORT
+  description: Microbin web port
+  default: '8080'
+  required: false
+- name: MBIN_TAG
+  description: Microbin image tag
+  default: latest
+  required: false
+compose: |
+  services:
+    microbin:
+      image: danielszabo99/microbin:${MBIN_TAG}
+      container_name: ${STACK_NAME}
+      init: true
+      restart: unless-stopped
+      networks:
+        - proxy
+      volumes:
+        - ${STACK_NAME}_data:/app/data
+  volumes:
+    ${STACK_NAME}_data:
+  networks:
+    proxy:
+      external: true

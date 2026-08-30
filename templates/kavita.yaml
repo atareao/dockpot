@@ -1,0 +1,20 @@
+name: kavita
+category: media
+description: Kavita ebook and comic server
+variables:
+- name: KAVITA_PORT
+  description: Kavita Port
+  default: '5000'
+  required: false
+- name: KAVITA_TAG
+  description: Kavita Tag
+  default: latest
+  required: false
+- name: TZ
+  description: Tz
+  default: Europe/Madrid
+  required: false
+compose: "services:\n  kavita:\n    image: jvmilazz0/kavita:${KAVITA_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    restart: unless-stopped\n    init: true\n    environment:\n\
+  \      TZ: ${TZ}\n    volumes:\n      - ${STACK_NAME}_books:/books\n      - ${STACK_NAME}_config:/kavita/config\n\
+  \    ports:\n      - \"${KAVITA_PORT}:5000\""

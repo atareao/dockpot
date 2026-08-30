@@ -1,0 +1,30 @@
+name: arcane
+description: "Arcane - Docker management dashboard"
+category: "management"
+variables:
+  - name: ARCANE_PORT
+    description: "Puerto para la interfaz web"
+    default: "3000"
+    required: false
+  - name: ARCANE_TAG
+    description: "Tag de la imagen"
+    default: "latest"
+    required: false
+  - name: SESSION_SECRET
+    description: "Secreto para las sesiones"
+    default: "change-me"
+    required: true
+compose: |
+  services:
+    arcane:
+      image: ghcr.io/ofkm/arcane:${ARCANE_TAG:-latest}
+      container_name: ${STACK_NAME}
+      ports:
+        - '${ARCANE_PORT:-3000}:3000'
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - ${STACK_NAME}_data:/app/data
+      environment:
+        - APP_ENV=production
+        - PUBLIC_SESSION_SECRET=${SESSION_SECRET}
+      restart: unless-stopped

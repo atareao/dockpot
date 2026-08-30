@@ -1,0 +1,20 @@
+name: kanboard
+category: productivity
+description: Kanban project management
+variables:
+- name: KB_PORT
+  description: Kb Port
+  default: '8080'
+  required: false
+- name: KB_TAG
+  description: Kb Tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Db Pass
+  default: change-me
+  required: true
+compose: "version: '3'\n\nservices:\n  kanboard:\n    image: kanboard/kanboard:${KB_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    restart: unless-stopped\n    ports:\n  \
+  \    - \"${KB_PORT}:80\"\n    volumes:\n      - ${STACK_NAME}_data:/var/www/app/data\n\
+  \      - ${STACK_NAME}_plugins:/var/www/app/plugins"

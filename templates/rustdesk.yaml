@@ -1,0 +1,39 @@
+name: rustdesk
+description: "RustDesk - Self-hosted remote desktop server"
+category: "tools"
+variables:
+  - name: RUSTDESK_RELAY_PORT
+    description: "Relay server port (hbbr)"
+    default: "21117"
+    required: false
+  - name: RUSTDESK_TAG
+    description: "RustDesk server image tag"
+    default: "latest"
+    required: false
+compose: |
+  services:
+    hbbs:
+      container_name: ${STACK_NAME}_hbbs
+      ports:
+        - 21115:21115
+        - 21116:21116
+        - 21116:21116/udp
+        - 21118:21118
+      image: rustdesk/rustdesk-server:${RUSTDESK_TAG}
+      command: hbbs -r localhost:${RUSTDESK_RELAY_PORT}
+      volumes:
+        - ${STACK_NAME}_data:/root
+      depends_on:
+        - hbbr
+      restart: unless-stopped
+
+    hbbr:
+      container_name: ${STACK_NAME}_hbbr
+      ports:
+        - ${RUSTDESK_RELAY_PORT}:21117
+        - 21119:21119
+      image: rustdesk/rustdesk-server:${RUSTDESK_TAG}
+      command: hbbr
+      volumes:
+        - ${STACK_NAME}_data:/root
+      restart: unless-stopped

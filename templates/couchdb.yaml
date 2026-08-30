@@ -1,0 +1,38 @@
+name: couchdb
+category: database
+description: CouchDB - document-oriented NoSQL database
+variables:
+- name: COUCHDB_PORT
+  description: CouchDB port
+  default: '5984'
+  required: false
+- name: COUCHDB_TAG
+  description: CouchDB image tag
+  default: latest
+  required: false
+- name: COUCHDB_USER
+  description: CouchDB admin username
+  default: admin
+  required: false
+- name: COUCHDB_PASS
+  description: CouchDB admin password
+  default: change-me
+  required: true
+compose: |
+  services:
+    couchdb:
+      image: couchdb:${COUCHDB_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      environment:
+        COUCHDB_USER: ${COUCHDB_USER}
+        COUCHDB_PASSWORD: ${COUCHDB_PASS}
+      networks:
+        - proxy
+      volumes:
+        - ${STACK_NAME}_data:/opt/couchdb/data
+  volumes:
+    ${STACK_NAME}_data:
+  networks:
+    proxy:
+      external: true

@@ -1,0 +1,16 @@
+name: filebrowser
+category: tools
+description: Filebrowser file manager
+variables:
+- name: FB_PORT
+  description: Fb Port
+  default: '8080'
+  required: false
+- name: FB_TAG
+  description: Fb Tag
+  default: latest
+  required: false
+compose: "services:\n  filebrowser:\n    image: filebrowser/filebrowser:${FB_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n\
+  \    volumes:\n      - ${STACK_NAME}_srv:/srv\n      - ${STACK_NAME}_database:/database.db\n\
+  \    ports:\n      - \"${FB_PORT}:80\""

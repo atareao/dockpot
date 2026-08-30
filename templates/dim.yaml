@@ -1,0 +1,16 @@
+name: dim
+category: management
+description: Dim Docker Image Manager
+variables:
+- name: DIM_PORT
+  description: Dim Port
+  default: '9090'
+  required: false
+- name: DIM_TAG
+  description: Dim Tag
+  default: latest
+  required: false
+compose: "services:\n  dim:\n    image: ghcr.io/dusk-labs/dim:${DIM_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n    volumes:\n    \
+  \  - ${STACK_NAME}_config:/opt/dim/config\n      - ${STACK_NAME}_media:/media\n\
+  \    ports:\n      - \"${DIM_PORT}:9090\""

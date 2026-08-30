@@ -1,0 +1,39 @@
+name: zincobserve
+category: monitoring
+description: Observability platform (ZincObserve)
+variables:
+- name: ZO_PORT
+  description: ZincObserve Port
+  default: '5080'
+  required: false
+- name: ZO_TAG
+  description: ZincObserve Tag
+  default: latest
+  required: false
+- name: ADMIN_USER
+  description: Admin User
+  default: admin
+  required: false
+- name: ADMIN_PASS
+  description: Admin Password
+  default: change-me
+  required: true
+compose: |
+  version: "3.7"
+
+  services:
+    zincobserve:
+      image: public.ecr.aws/zinclabs/zincobserve:${ZO_TAG}
+      init: true
+      container_name: ${STACK_NAME}
+      environment:
+        ZO_ROOT_USER_EMAIL: ${ADMIN_USER}
+        ZO_ROOT_USER_PASSWORD: ${ADMIN_PASS}
+      volumes:
+        - ${STACK_NAME}_data:/data
+      ports:
+        - "${ZO_PORT}:5080"
+      restart: always
+
+  volumes:
+    ${STACK_NAME}_data: {}

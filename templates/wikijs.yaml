@@ -1,0 +1,21 @@
+name: wikijs
+category: content
+description: Wiki.js knowledge base
+variables:
+- name: WIKI_PORT
+  description: Wiki Port
+  default: '3000'
+  required: false
+- name: WIKI_TAG
+  description: Wiki Tag
+  default: latest
+  required: false
+compose: "services:\n  wikijs:\n    image: ghcr.io/requarks/wiki:${WIKI_TAG}\n   \
+  \ container_name: ${STACK_NAME}\n    init: true\n    depends_on:\n      - db\n \
+  \   environment:\n      - DB_TYPE=postgres\n      - DB_HOST=db\n      - DB_PORT=5432\n\
+  \      - DB_USER=wikijs\n      - DB_PASS=wikijs\n      - DB_NAME=wiki\n    restart:\
+  \ unless-stopped\n    ports:\n      - \"${WIKI_PORT}:3000\"\n  db:\n    image: postgres:14-alpine\n\
+  \    container_name: ${STACK_NAME}_db\n    init: true\n    logging:\n      driver:\
+  \ \"none\"\n    environment:\n      - POSTGRES_DB=wiki\n      - POSTGRES_PASSWORD=wikijs\n\
+  \      - POSTGRES_USER=wikijs\n    restart: unless-stopped\n    volumes:\n     \
+  \ - ${STACK_NAME}_database:/var/lib/postgresql/data"

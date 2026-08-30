@@ -1,0 +1,22 @@
+name: nitter
+category: content
+description: Nitter Twitter/X frontend
+variables:
+- name: NITTER_PORT
+  description: Nitter Port
+  default: '8080'
+  required: false
+- name: NITTER_TAG
+  description: Nitter Tag
+  default: latest
+  required: false
+compose: "services:\n  nitter:\n    image: zedeus/nitter:${NITTER_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    restart: unless-stopped\n    depends_on:\n      - nitter-redis\n\
+  \    volumes:\n      - ${STACK_NAME}_config:/src/nitter.conf:ro\n    ports:\n  \
+  \    - \"${NITTER_PORT}:8080\"\n    healthcheck:\n      test: wget -nv --tries=1\
+  \ --spider http://127.0.0.1:8080/Jack/status/20 || exit 1\n      interval: 30s\n\
+  \      timeout: 5s\n      retries: 2\n  nitter-redis:\n    image: redis:6-alpine\n\
+  \    container_name: ${STACK_NAME}_redis\n    command: redis-server --save 60 1\
+  \ --loglevel warning\n    restart: unless-stopped\n    volumes:\n      - ${STACK_NAME}_redis:/data\n\
+  \    healthcheck:\n      test: redis-cli ping\n      interval: 30s\n      timeout:\
+  \ 5s\n      retries: 2"

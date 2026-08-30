@@ -1,0 +1,29 @@
+name: bookstack
+category: content
+description: BookStack wiki and documentation manager
+variables:
+- name: BS_PORT
+  description: Bs Port
+  default: '8080'
+  required: false
+- name: BS_TAG
+  description: Bs Tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Db Pass
+  default: change-me
+  required: true
+- name: APP_KEY
+  description: App Key
+  default: change-me
+  required: true
+compose: "services:\n  bookstack:\n    image: lscr.io/linuxserver/bookstack:${BS_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    environment:\n      - APP_URL=http://localhost:${BS_PORT}\n\
+  \      - DB_HOST=bookstack_db\n      - DB_USER=bookstack\n      - DB_PASS=${DB_PASS}\n\
+  \      - DB_DATABASE=bookstack\n    volumes:\n      - ${STACK_NAME}_config:/config\n\
+  \    restart: unless-stopped\n    depends_on:\n      - bookstack_db\n    ports:\n\
+  \      - \"${BS_PORT}:80\"\n  bookstack_db:\n    image: lscr.io/linuxserver/mariadb\n\
+  \    container_name: ${STACK_NAME}_db\n    environment:\n      - MYSQL_ROOT_PASSWORD=${DB_PASS}\n\
+  \      - MYSQL_DATABASE=bookstack\n      - MYSQL_USER=bookstack\n      - MYSQL_PASSWORD=${DB_PASS}\n\
+  \    volumes:\n      - ${STACK_NAME}_database:/config\n    restart: unless-stopped"

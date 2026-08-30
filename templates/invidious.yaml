@@ -1,0 +1,28 @@
+name: invidious
+category: content
+description: Invidious YouTube frontend
+variables:
+- name: INV_PORT
+  description: Inv Port
+  default: '3000'
+  required: false
+- name: INV_TAG
+  description: Inv Tag
+  default: latest
+  required: false
+compose: "services:\n  invidious:\n    image: sriegler/invidious-auth:${INV_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    restart: unless-stopped\n    init: true\n\
+  \    mem_limit: 1024M\n    cpus: 0.5\n    environment:\n      INVIDIOUS_CONFIG:\
+  \ |\n        channel_threads: 1\n        check_tables: true\n        feed_threads:\
+  \ 1\n        db:\n          dbname: invidious\n          user: kemal\n         \
+  \ password: kemal\n          host: postgres\n          port: 5432\n        full_refresh:\
+  \ false\n        https_only: false\n        popular_enabled: false\n        statistics_enabled:\
+  \ false\n        domain: localhost\n        external_port: ${INV_PORT}\n       \
+  \ registration_enabled: false\n        captcha_enabled: false\n        admins: []\n\
+  \        disable_proxy: false\n        geo_bypass: false\n    depends_on:\n    \
+  \  - postgres\n    ports:\n      - \"${INV_PORT}:3000\"\n  postgres:\n    image:\
+  \ postgres:14\n    container_name: ${STACK_NAME}_db\n    restart: unless-stopped\n\
+  \    init: true\n    volumes:\n      - ${STACK_NAME}_database:/var/lib/postgresql/data\n\
+  \    environment:\n      POSTGRES_DB: invidious\n      POSTGRES_USER: kemal\n  \
+  \    POSTGRES_PASSWORD: kemal\n    healthcheck:\n      test: [\"CMD-SHELL\", \"\
+  pg_isready -U $$POSTGRES_USER $$POSTGRES_DB\"]"

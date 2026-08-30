@@ -1,0 +1,54 @@
+name: atuin
+category: tools
+description: Atuin - shell history sync server with PostgreSQL
+variables:
+- name: ATUIN_PORT
+  description: Atuin Port
+  default: '8888'
+  required: false
+- name: ATUIN_TAG
+  description: Atuin image tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: PostgreSQL password
+  default: change-me
+  required: false
+- name: TZ
+  description: Timezone
+  default: Europe/Madrid
+  required: false
+compose: |
+  services:
+    atuin:
+      image: ellieh/atuin:${ATUIN_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      init: true
+      environment:
+        - ATUIN_HOST=0.0.0.0
+        - ATUIN_PORT=${ATUIN_PORT}
+        - ATUIN_OPEN_REGISTRATION=false
+        - ATUIN_DB_URI=postgres://atuin:${DB_PASS}@postgres/atuin
+      networks:
+        - proxy
+        - internal
+    postgres:
+      image: postgres:16-alpine
+      container_name: ${STACK_NAME}_db
+      restart: unless-stopped
+      init: true
+      environment:
+        - POSTGRES_USER=atuin
+        - POSTGRES_PASSWORD=${DB_PASS}
+        - POSTGRES_DB=atuin
+      volumes:
+        - ${STACK_NAME}_data:/var/lib/postgresql/data
+      networks:
+        - internal
+  volumes:
+    ${STACK_NAME}_data:
+  networks:
+    internal:
+    proxy:
+      external: true

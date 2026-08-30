@@ -1,0 +1,30 @@
+name: mattermost
+description: "Mattermost - Self-hosted team communication platform"
+category: "communication"
+variables:
+  - name: MM_PORT
+    description: "HTTP port for the web UI"
+    default: "8065"
+    required: false
+  - name: MM_TAG
+    description: "Mattermost image tag"
+    default: "latest"
+    required: false
+compose: |
+  services:
+    mattermost:
+      image: mattermost/mattermost-team-edition:${MM_TAG}
+      container_name: ${STACK_NAME}
+      init: true
+      restart: unless-stopped
+      volumes:
+        - ${STACK_NAME}_config:/mattermost/config
+        - ${STACK_NAME}_data:/mattermost/data
+        - ${STACK_NAME}_logs:/mattermost/logs
+        - ${STACK_NAME}_plugins:/mattermost/plugins
+      environment:
+        MM_USERNAME: mmuser
+        MM_PASSWORD: mmuser_password
+        MM_DBNAME: mattermost
+      ports:
+        - ${MM_PORT}:8065

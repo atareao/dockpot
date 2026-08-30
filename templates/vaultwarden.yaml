@@ -1,0 +1,23 @@
+name: vaultwarden
+description: "Vaultwarden - Bitwarden compatible password manager server"
+category: "security"
+variables:
+  - name: VW_PORT
+    description: "HTTP port for the web UI"
+    default: "9099"
+    required: false
+  - name: VW_TAG
+    description: "Vaultwarden image tag"
+    default: "latest"
+    required: false
+compose: |
+  services:
+    vaultwarden:
+      image: vaultwarden/server:${VW_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      init: true
+      volumes:
+        - ${STACK_NAME}_data:/data/
+      ports:
+        - ${VW_PORT}:80

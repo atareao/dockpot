@@ -1,0 +1,47 @@
+name: mariadb
+description: "MariaDB database server"
+category: database
+variables:
+  - name: MARIADB_TAG
+    description: "MariaDB image tag"
+    default: "11"
+    required: false
+  - name: MARIADB_DATABASE
+    description: "Database name"
+    default: app
+    required: false
+  - name: MARIADB_USER
+    description: "Database user"
+    default: app
+    required: false
+  - name: MARIADB_PASSWORD
+    description: "Database password"
+    default: ""
+    required: true
+  - name: MARIADB_ROOT_PASSWORD
+    description: "Root password"
+    default: ""
+    required: true
+  - name: MARIADB_PORT
+    description: "Port"
+    default: "3306"
+    required: false
+  - name: MARIADB_DATA_DIR
+    description: "Data directory"
+    default: "./mariadb/data"
+    required: false
+compose: |
+  services:
+    mariadb:
+      image: mariadb:${MARIADB_TAG:-11}
+      container_name: ${STACK_NAME}-mariadb
+      environment:
+        MARIADB_DATABASE: ${MARIADB_DATABASE:-app}
+        MARIADB_USER: ${MARIADB_USER:-app}
+        MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+        MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      ports:
+        - "${MARIADB_PORT:-3306}:3306"
+      volumes:
+        - ${MARIADB_DATA_DIR:-./mariadb/data}:/var/lib/mysql
+      restart: unless-stopped

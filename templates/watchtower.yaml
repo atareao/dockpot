@@ -1,0 +1,19 @@
+name: watchtower
+category: management
+description: Automatic container updates
+variables:
+- name: WT_TAG
+  description: Wt Tag
+  default: latest
+  required: false
+- name: WT_SCHEDULE
+  description: Wt Schedule
+  default: 0 0 4 * * *
+  required: false
+compose: "version: '3.7'\n\nservices:\n  watchtower:\n    image: containrrr/watchtower:${WT_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n\
+  \    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock:ro\n      - /etc/localtime:/etc/localtime:ro\n\
+  \      - ${STACK_NAME}_config:/config.json\n    environment:\n      - WATCHTOWER_SCHEDULE=${WT_SCHEDULE}\n\
+  \      - WATCHTOWER_CLEANUP=true\n      - WATCHTOWER_NOTIFICATIONS=email\n    networks:\n\
+  \      - internal\n\nvolumes:\n  ${STACK_NAME}_config: {}\n\nnetworks:\n  internal:\
+  \ {}"

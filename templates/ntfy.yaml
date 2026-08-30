@@ -1,0 +1,15 @@
+name: ntfy
+category: communication
+description: Ntfy push notification server
+variables:
+- name: NTFY_PORT
+  description: Ntfy Port
+  default: '8080'
+  required: false
+- name: NTFY_TAG
+  description: Ntfy Tag
+  default: latest
+  required: false
+compose: "services:\n  ntfy:\n    build: .\n    image: atareao/ntfy:${NTFY_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    volumes:\n      - ${STACK_NAME}_etc:/etc/ntfy\n\
+  \    ports:\n      - \"${NTFY_PORT}:80\""

@@ -1,0 +1,69 @@
+name: odoo
+category: productivity
+description: ERP with PostgreSQL
+variables:
+- name: ODOO_PORT
+  description: Odoo Port
+  default: '8069'
+  required: false
+- name: ODOO_TAG
+  description: Odoo Tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Database Password
+  default: change-me
+  required: true
+- name: ADMIN_PASS
+  description: Admin Password
+  default: admin
+  required: false
+compose: |
+  version: '3.7'
+
+  services:
+    odoo:
+      image: odoo:${ODOO_TAG}
+      container_name: ${STACK_NAME}
+      init: true
+      restart: unless-stopped
+      networks:
+        - proxy
+        - internal
+      volumes:
+        - ${STACK_NAME}_data:/var/lib/odoo
+        - ${STACK_NAME}_config:/etc/odoo/odoo.conf
+        - ${STACK_NAME}_addons:/mnt/extra-addons
+      environment:
+        HOST: db
+        USER: odoo
+        PASSWORD: ${DB_PASS}
+      depends_on:
+        - db
+      ports:
+        - "${ODOO_PORT}:8069"
+
+    db:
+      image: postgres:15
+      container_name: ${STACK_NAME}_db
+      init: true
+      restart: unless-stopped
+      networks:
+        - internal
+      volumes:
+        - ${STACK_NAME}_db:/var/lib/postgresql/data
+      environment:
+        POSTGRES_USER: odoo
+        POSTGRES_PASSWORD: ${DB_PASS}
+        POSTGRES_DB: postgres
+
+  volumes:
+    ${STACK_NAME}_data: {}
+    ${STACK_NAME}_config: {}
+    ${STACK_NAME}_addons: {}
+    ${STACK_NAME}_db: {}
+
+  networks:
+    internal: {}
+    proxy:
+      external: true

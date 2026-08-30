@@ -1,0 +1,34 @@
+name: planka
+category: productivity
+description: Kanban board with PostgreSQL
+variables:
+- name: PLANK_PORT
+  description: Plank Port
+  default: '1337'
+  required: false
+- name: PLANK_TAG
+  description: Plank Tag
+  default: latest
+  required: false
+- name: SECRET_KEY
+  description: Secret Key
+  default: change-me
+  required: true
+compose: "version: '3.7'\n\nservices:\n  planka:\n    image: ghcr.io/plankanban/planka:${PLANK_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    init: true\n    command: >\n      bash -c\n\
+  \        \"for i in `seq 1 30`; do\n          ./start.sh &&\n          s=$$? &&\
+  \ break || s=$$?;\n          echo \\\"Tried $$i times. Waiting 5 seconds...\\\"\
+  ;\n          sleep 5;\n        done; (exit $$s)\"\n    restart: unless-stopped\n\
+  \    volumes:\n      - ${STACK_NAME}_user_avatars:/app/public/user-avatars\n   \
+  \   - ${STACK_NAME}_project_backgrounds:/app/public/project-background-images\n\
+  \      - ${STACK_NAME}_attachments:/app/private/attachments\n    networks:\n   \
+  \   - internal\n      - proxy\n    environment:\n      - BASE_URL=https://${FQDN}\n\
+  \      - TRUST_PROXY=true\n      - DATABASE_URL=postgresql://planka:${SECRET_KEY}@postgres/planka\n\
+  \      - SECRET_KEY=${SECRET_KEY}\n    ports:\n      - \"${PLANK_PORT}:1337\"\n\
+  \    depends_on:\n      - postgres\n\n  postgres:\n    image: postgres:14-alpine\n\
+  \    container_name: ${STACK_NAME}_db\n    init: true\n    restart: unless-stopped\n\
+  \    volumes:\n      - ${STACK_NAME}_db_data:/var/lib/postgresql/data\n    environment:\n\
+  \      - POSTGRES_DB=planka\n      - POSTGRES_PASSWORD=${SECRET_KEY}\n    networks:\n\
+  \      - internal\n\nvolumes:\n  ${STACK_NAME}_user_avatars:\n  ${STACK_NAME}_project_backgrounds:\n\
+  \  ${STACK_NAME}_attachments:\n  ${STACK_NAME}_db_data:\n\nnetworks:\n  internal:\n\
+  \  proxy:\n    external: true"

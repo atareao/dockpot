@@ -1,0 +1,28 @@
+name: composr
+description: "Composr - Docker compose project manager"
+category: "management"
+variables:
+  - name: COMPOSR_PORT
+    description: "Puerto para la interfaz web"
+    default: "5003"
+    required: false
+  - name: COMPOSR_TAG
+    description: "Tag de la imagen"
+    default: "latest"
+    required: false
+compose: |
+  services:
+    composr:
+      image: vansmak/composr:${COMPOSR_TAG:-latest}
+      container_name: ${STACK_NAME}
+      ports:
+        - "${COMPOSR_PORT:-5003}:5003"
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - ${STACK_NAME}_projects:/app/projects
+        - ${STACK_NAME}_data:/app/data
+      environment:
+        COMPOSE_DIR: /app/projects
+        METADATA_DIR: /app/data
+        CONTAINER_METADATA_FILE: /app/data/metadata.json
+      restart: unless-stopped

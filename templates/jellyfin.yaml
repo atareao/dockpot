@@ -1,0 +1,29 @@
+name: jellyfin
+category: media
+description: Jellyfin media server
+variables:
+- name: JELLYFIN_PORT
+  description: Jellyfin Port
+  default: '8096'
+  required: false
+- name: JELLYFIN_TAG
+  description: Jellyfin Tag
+  default: latest
+  required: false
+- name: PUID
+  description: Puid
+  default: '1000'
+  required: false
+- name: PGID
+  description: Pgid
+  default: '1000'
+  required: false
+- name: TZ
+  description: Tz
+  default: Europe/Madrid
+  required: false
+compose: "services:\n  jellyfin:\n    image: jellyfin/jellyfin:${JELLYFIN_TAG}\n \
+  \   container_name: ${STACK_NAME}\n    restart: unless-stopped\n    user: ${PUID}:${PGID}\n\
+  \    volumes:\n      - ${STACK_NAME}_config:/config\n      - ${STACK_NAME}_cache:/cache\n\
+  \      - ${STACK_NAME}_media:/media\n    environment:\n      - TZ=${TZ}\n    ports:\n\
+  \      - \"${JELLYFIN_PORT}:8096\""

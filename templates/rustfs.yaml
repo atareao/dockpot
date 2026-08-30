@@ -1,0 +1,50 @@
+name: rustfs
+description: "Rustfs"
+category: storage
+variables:
+  - name: RUSTFS_PORT
+    description: "S3 API port"
+    default: "9000"
+    required: false
+  - name: RUSTFS_TAG
+    description: "Image tag"
+    default: "latest"
+    required: false
+  - name: RUSTFS_CONSOLE_PORT
+    description: "Console UI port"
+    default: "9001"
+    required: false
+  - name: ACCESS_KEY
+    description: "S3 access key"
+    default: "change-me"
+    required: true
+  - name: SECRET_KEY
+    description: "S3 secret key"
+    default: "change-me"
+    required: true
+  - name: FQDN
+    description: "Fully qualified domain name"
+    default: "rustfs.example.com"
+    required: false
+compose: |
+  services:
+    rustfs:
+      image: rustfs/rustfs
+      container_name: rustfs
+      init: true
+      volumes:
+        - data:/data
+      restart: unless-stopped
+      networks:
+        - proxy
+      labels:
+        traefik.enable: "true"
+        traefik.http.services.rustfs.loadbalancer.server.port: "7000"
+        traefik.http.routers.rustfs.entrypoints: "https"
+        traefik.http.routers.rustfs.rule: "Host(`${FQDN}`)"
+  volumes:
+    data: {}
+  networks:
+    proxy:
+      external: true
+  

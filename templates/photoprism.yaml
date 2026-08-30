@@ -1,0 +1,48 @@
+name: photoprism
+category: media
+description: PhotoPrism - AI-powered photo management server
+variables:
+- name: PP_PORT
+  description: PhotoPrism web port
+  default: '2342'
+  required: false
+- name: PP_TAG
+  description: PhotoPrism image tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Database password
+  default: change-me
+  required: true
+- name: ADMIN_PASS
+  description: Admin password
+  default: change-me
+  required: true
+- name: TZ
+  description: Timezone
+  default: Europe/Madrid
+  required: false
+compose: |
+  services:
+    photoprism:
+      image: photoprism/photoprism:${PP_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      security_opt:
+        - seccomp:unconfined
+        - apparmor:unconfined
+      environment:
+        PHOTOPRISM_ADMIN_PASSWORD: ${ADMIN_PASS}
+        PHOTOPRISM_DATABASE_PASSWORD: ${DB_PASS}
+        PHOTOPRISM_SITE_URL: http://localhost:${PP_PORT}
+        PHOTOPRISM_UID: 1000
+        PHOTOPRISM_GID: 1000
+        TZ: ${TZ}
+      volumes:
+        - ${STACK_NAME}_pictures:/photoprism/originals
+        - ${STACK_NAME}_storage:/photoprism/storage
+      ports:
+        - "${PP_PORT}:2342"
+  volumes:
+    ${STACK_NAME}_pictures:
+    ${STACK_NAME}_storage:

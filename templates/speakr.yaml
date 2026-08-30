@@ -1,0 +1,29 @@
+name: speakr
+description: "Speakr - AI-powered speech transcription and analysis"
+category: "ai"
+variables:
+  - name: SPEAKR_PORT
+    description: "HTTP port for the web UI"
+    default: "8899"
+    required: false
+  - name: SPEAKR_TAG
+    description: "Speakr image tag"
+    default: "latest"
+    required: false
+  - name: LOG_LEVEL
+    description: "Logging level (ERROR, WARNING, INFO, DEBUG)"
+    default: "ERROR"
+    required: false
+compose: |
+  services:
+    app:
+      image: learnedmachine/speakr:${SPEAKR_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      ports:
+        - "${SPEAKR_PORT}:8899"
+      environment:
+        - LOG_LEVEL=${LOG_LEVEL}
+      volumes:
+        - ${STACK_NAME}_uploads:/data/uploads
+        - ${STACK_NAME}_instance:/data/instance

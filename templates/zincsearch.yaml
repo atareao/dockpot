@@ -1,0 +1,25 @@
+name: zincsearch
+category: database
+description: ZincSearch search engine
+variables:
+- name: ZINC_PORT
+  description: Zinc Port
+  default: '4080'
+  required: false
+- name: ZINC_TAG
+  description: Zinc Tag
+  default: latest
+  required: false
+- name: ZINC_ADMIN_USER
+  description: Zinc Admin User
+  default: admin
+  required: false
+- name: ZINC_ADMIN_PASS
+  description: Zinc Admin Pass
+  default: admin
+  required: false
+compose: "services:\n  zinc:\n    image: public.ecr.aws/h9e2j3o7/zinc:${ZINC_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    environment:\n      DATA_PATH: /data\n  \
+  \    ZINC_FIRST_ADMIN_USER: ${ZINC_ADMIN_USER}\n      ZINC_FIRST_ADMIN_PASSWORD:\
+  \ ${ZINC_ADMIN_PASS}\n    volumes:\n      - ${STACK_NAME}_data:/data\n    restart:\
+  \ always\n    ports:\n      - \"${ZINC_PORT}:4080\""

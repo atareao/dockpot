@@ -1,0 +1,15 @@
+name: pairdrop
+category: tools
+description: PairDrop local file sharing
+variables:
+- name: PD_PORT
+  description: Pd Port
+  default: '3000'
+  required: false
+- name: PD_TAG
+  description: Pd Tag
+  default: latest
+  required: false
+compose: "services:\n  pairdrop:\n    container_name: ${STACK_NAME}\n    init: true\n\
+  \    image: ghcr.io/schlagmichdoch/pairdrop:${PD_TAG}\n    restart: unless-stopped\n\
+  \    ports:\n      - \"${PD_PORT}:3000\""

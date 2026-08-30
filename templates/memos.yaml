@@ -1,0 +1,28 @@
+name: memos
+category: productivity
+description: Memos - lightweight note-taking with tags and sharing
+variables:
+- name: MEMOS_PORT
+  description: Memos web port
+  default: '5230'
+  required: false
+- name: MEMOS_TAG
+  description: Memos image tag
+  default: latest
+  required: false
+compose: |
+  services:
+    memos:
+      image: neosmemo/memos:${MEMOS_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      init: true
+      volumes:
+        - ${STACK_NAME}_data:/var/opt/memos
+      networks:
+        - proxy
+  volumes:
+    ${STACK_NAME}_data:
+  networks:
+    proxy:
+      external: true

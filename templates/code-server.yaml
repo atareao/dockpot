@@ -1,0 +1,45 @@
+name: code-server
+category: dev
+description: code-server - VS Code in the browser
+variables:
+- name: CS_PORT
+  description: Code server port
+  default: '8443'
+  required: false
+- name: CS_TAG
+  description: Code server image tag
+  default: latest
+  required: false
+- name: PASSWORD
+  description: Authentication password
+  default: change-me
+  required: true
+- name: TZ
+  description: Timezone
+  default: Europe/Madrid
+  required: false
+compose: |
+  services:
+    code-server:
+      image: atareao/custom-code-server:${CS_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      environment:
+        - PUID=1000
+        - PGID=1000
+        - TZ=${TZ}
+        - AUTH=password
+        - PASSWORD=${PASSWORD}
+        - DOCKER_USER=abc
+        - DEFAULT_WORKSPACE=/config/workspace
+      volumes:
+        - ${STACK_NAME}_data:/config
+        - ${STACK_NAME}_workspace:/config/workspace
+      networks:
+        - proxy
+  volumes:
+    ${STACK_NAME}_data:
+    ${STACK_NAME}_workspace:
+  networks:
+    proxy:
+      external: true

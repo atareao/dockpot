@@ -1,0 +1,26 @@
+name: pastebin
+category: tools
+description: Simple pastebin service
+variables:
+- name: PASTE_PORT
+  description: Pastebin Port
+  default: '8080'
+  required: false
+- name: PASTE_TAG
+  description: Pastebin Tag
+  default: latest
+  required: false
+compose: |
+  version: '3'
+  services:
+    pastebin:
+      image: atareao/pastebin:${PASTE_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      init: true
+      ports:
+        - "${PASTE_PORT}:80"
+      volumes:
+        - ${STACK_NAME}_db:/rs/db
+  volumes:
+    ${STACK_NAME}_db:

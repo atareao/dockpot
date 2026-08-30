@@ -1,0 +1,12 @@
+name: unbound
+category: tools
+description: DNS resolver
+variables:
+- name: UNBOUND_TAG
+  description: Unbound Tag
+  default: latest
+  required: false
+compose: "services:\n  unbound:\n    container_name: ${STACK_NAME}\n    image: mvance/unbound:${UNBOUND_TAG}\n\
+  \    init: true\n    ports:\n      - 53:53/tcp\n      - 53:53/udp\n    volumes:\n\
+  \      - ${STACK_NAME}_config:/opt/unbound/etc/unbound/\n    restart: unless-stopped\n\
+  \nvolumes:\n  ${STACK_NAME}_config:"

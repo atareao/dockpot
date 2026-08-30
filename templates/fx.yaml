@@ -1,0 +1,34 @@
+name: fx
+description: "FX - File manager for headless servers"
+category: "tools"
+variables:
+  - name: FX_PORT
+    description: "Puerto para la interfaz web"
+    default: "3000"
+    required: false
+  - name: FX_USERNAME
+    description: "Nombre de usuario"
+    default: "admin"
+    required: false
+  - name: FX_PASSWORD
+    description: "Contraseña de acceso"
+    default: "changeme"
+    required: true
+  - name: FX_DOMAIN
+    description: "Dominio de la aplicación"
+    default: "localhost"
+    required: false
+compose: |
+  services:
+    fx:
+      image: rikhuijzer/fx:main
+      container_name: ${STACK_NAME}
+      environment:
+        FX_USERNAME: '${FX_USERNAME:-admin}'
+        FX_DOMAIN: '${FX_DOMAIN:-localhost}'
+        FX_PASSWORD: "${FX_PASSWORD}"
+      ports:
+        - '${FX_PORT:-3000}:3000'
+      volumes:
+        - ${STACK_NAME}_data:/data
+      restart: unless-stopped

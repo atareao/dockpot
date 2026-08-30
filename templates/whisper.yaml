@@ -1,0 +1,35 @@
+name: whisper
+description: "Whisper ASR - OpenAI Whisper speech-to-text web service"
+category: "ai"
+variables:
+  - name: WHISPER_PORT
+    description: "HTTP port for the API"
+    default: "9000"
+    required: false
+  - name: WHISPER_MODEL
+    description: "ASR model size (tiny, base, small, medium, large, large-v1, large-v2, large-v3)"
+    default: "large-v1"
+    required: false
+  - name: WHISPER_ENGINE
+    description: "ASR engine (faster_whisper, openai_whisper)"
+    default: "faster_whisper"
+    required: false
+  - name: WHISPER_TAG
+    description: "Whisper ASR image tag"
+    default: "latest"
+    required: false
+compose: |
+  services:
+    whisper:
+      image: onerahmet/openai-whisper-asr-webservice:${WHISPER_TAG}
+      container_name: ${STACK_NAME}
+      restart: unless-stopped
+      init: true
+      environment:
+        ASR_MODEL: ${WHISPER_MODEL}
+        ASR_ENGINE: ${WHISPER_ENGINE}
+        ASR_MODEL_PATH: /data/whisper
+      volumes:
+        - ${STACK_NAME}_data:/data/whisper
+      ports:
+        - ${WHISPER_PORT}:9000

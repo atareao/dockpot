@@ -1,0 +1,51 @@
+name: facturascripts
+category: productivity
+description: Invoicing and accounting with MariaDB
+variables:
+- name: FS_PORT
+  description: Facturascripts Port
+  default: '8080'
+  required: false
+- name: FS_TAG
+  description: Facturascripts Tag
+  default: latest
+  required: false
+- name: DB_PASS
+  description: Database Password
+  default: change-me
+  required: false
+compose: |
+  version: "3"
+
+  services:
+    mariadb:
+      image: mariadb
+      container_name: ${STACK_NAME}_db
+      restart: unless-stopped
+      volumes:
+        - ${STACK_NAME}_mariadb:/var/lib/mysql
+      environment:
+        MYSQL_ROOT_PASSWORD: ${DB_PASS}
+      networks:
+        - internal
+
+    facturascripts:
+      image: facturascripts/facturascripts:${FS_TAG}
+      container_name: ${STACK_NAME}
+      restart: always
+      volumes:
+        - ${STACK_NAME}_data:/var/www/html
+      ports:
+        - "${FS_PORT}:80"
+      networks:
+        - internal
+        - proxy
+
+  volumes:
+    ${STACK_NAME}_mariadb:
+    ${STACK_NAME}_data:
+
+  networks:
+    internal:
+    proxy:
+      external: true

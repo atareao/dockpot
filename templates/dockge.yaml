@@ -1,0 +1,18 @@
+name: dockge
+category: management
+description: Docker Compose manager
+variables:
+- name: DOCKGE_PORT
+  description: Dockge Port
+  default: '5001'
+  required: false
+- name: DOCKGE_TAG
+  description: Dockge Tag
+  default: latest
+  required: false
+compose: "services:\n  dockge:\n    image: louislam/dockge:${DOCKGE_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    restart: unless-stopped\n    init: true\n    volumes:\n   \
+  \   - /var/run/docker.sock:/var/run/docker.sock\n      - ./stacks:/opt/stacks\n\
+  \      - ${STACK_NAME}_data:/app/data\n    environment:\n      - DOCKGE_STACKS_DIR=/opt/stacks\n\
+  \      - DOCKGE_ENABLE_CONSOLE=true\n    ports:\n      - \"${DOCKGE_PORT}:5001\"\
+  \n\nvolumes:\n  ${STACK_NAME}_data: {}"

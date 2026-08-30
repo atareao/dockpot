@@ -1,0 +1,30 @@
+name: den
+description: "Den"
+category: dev
+variables:
+  - name: DENO_PORT
+    description: "Web UI port"
+    default: "8080"
+    required: false
+  - name: DENO_TAG
+    description: "Image tag"
+    default: "latest"
+    required: false
+compose: |
+  version: "3.7"
+  
+  services:
+    den:
+      image: atareao/den:latest
+      container_name: den
+      init: true
+      restart: unless-stopped
+      hostname: co1
+      volumes:
+        - ./config.yml:/app/config.yml
+        - /var/run/docker.sock:/var/run/docker.sock
+  
+  volumes:
+    share:
+      external: true
+  

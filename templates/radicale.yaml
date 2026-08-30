@@ -1,0 +1,16 @@
+name: radicale
+category: tools
+description: CalDAV/CardDAV server
+variables:
+- name: RAD_PORT
+  description: Rad Port
+  default: '5232'
+  required: false
+- name: RAD_TAG
+  description: Rad Tag
+  default: latest
+  required: false
+compose: "version: '3'\n\nservices:\n  radicale:\n    build: ./\n    image: atareao/radicale:${RAD_TAG}\n\
+  \    container_name: ${STACK_NAME}\n    restart: unless-stopped\n    ports:\n  \
+  \    - \"${RAD_PORT}:5232\"\n    volumes:\n      - ${STACK_NAME}_data:/app/data\n\
+  \      - ${STACK_NAME}_users:/app/.htpasswd-users"

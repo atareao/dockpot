@@ -1,0 +1,16 @@
+name: navidrome
+category: media
+description: Navidrome music streaming server
+variables:
+- name: ND_PORT
+  description: Nd Port
+  default: '4533'
+  required: false
+- name: ND_TAG
+  description: Nd Tag
+  default: latest
+  required: false
+compose: "services:\n  navidrome:\n    image: deluan/navidrome:${ND_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n    volumes:\n   \
+  \   - ${STACK_NAME}_music:/music:ro\n      - ${STACK_NAME}_data:/data\n    ports:\n\
+  \      - \"${ND_PORT}:4533\""

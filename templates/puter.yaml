@@ -1,0 +1,33 @@
+name: puter
+description: "Puter - Self-hosted cloud operating system"
+category: "cloud"
+variables:
+  - name: PUTER_PORT
+    description: "HTTP port for the web UI"
+    default: "4100"
+    required: false
+  - name: PUTER_TAG
+    description: "Puter image tag"
+    default: "latest"
+    required: false
+  - name: TZ
+    description: "Timezone (e.g. Europe/Madrid, UTC)"
+    default: "Europe/Madrid"
+    required: false
+compose: |
+  services:
+    puter:
+      container_name: ${STACK_NAME}
+      image: ghcr.io/heyputer/puter:${PUTER_TAG}
+      init: true
+      restart: unless-stopped
+      ports:
+        - '${PUTER_PORT}:4100'
+      environment:
+        TZ: ${TZ}
+        CONFIG_PATH: /etc/puter
+        PUID: 1000
+        PGID: 1000
+      volumes:
+        - ${STACK_NAME}_config:/etc/puter
+        - ${STACK_NAME}_data:/var/puter

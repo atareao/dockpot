@@ -1,0 +1,47 @@
+name: ollama
+description: "Ollama LLM server with Open WebUI"
+category: ai
+variables:
+  - name: OLLAMA_PORT
+    description: "Ollama API port"
+    default: "11434"
+    required: false
+  - name: WEBUI_PORT
+    description: "Open WebUI port"
+    default: "8080"
+    required: false
+  - name: GPU_ENABLED
+    description: "Enable GPU support (true/false)"
+    default: "false"
+    required: false
+compose: |
+  services:
+    ollama:
+      image: ollama/ollama
+      container_name: ${STACK_NAME}-ollama
+      restart: unless-stopped
+      init: true
+      tty: true
+      ports:
+        - ${OLLAMA_PORT:-11434}:11434
+      volumes:
+        - ollama_data:/root/.ollama
+    open-webui:
+      image: ghcr.io/open-webui/open-webui:main
+      container_name: ${STACK_NAME}-open-webui
+      restart: unless-stopped
+      init: true
+      volumes:
+        - openwebui_data:/app/backend/data
+      depends_on:
+        - ollama
+      ports:
+        - ${WEBUI_PORT:-8080}:8080
+      environment:
+        - OLLAMA_BASE_URL=http://ollama:11434
+        - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      extra_hosts:
+        - host.docker.internal:host-gateway
+  volumes:
+    ollama_data: {}
+    openwebui_data: {}

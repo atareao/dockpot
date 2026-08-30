@@ -1,0 +1,15 @@
+name: metube
+category: media
+description: MeTube YouTube downloader
+variables:
+- name: METUBE_PORT
+  description: Metube Port
+  default: '8081'
+  required: false
+- name: METUBE_TAG
+  description: Metube Tag
+  default: latest
+  required: false
+compose: "services:\n  metube:\n    image: alexta69/metube:${METUBE_TAG}\n    container_name:\
+  \ ${STACK_NAME}\n    init: true\n    restart: unless-stopped\n    volumes:\n   \
+  \   - ${STACK_NAME}_downloads:/downloads\n    ports:\n      - \"${METUBE_PORT}:8081\""

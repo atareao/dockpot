@@ -1,0 +1,27 @@
+name: vault
+description: "HashiCorp Vault - Secrets management"
+category: "security"
+variables:
+  - name: VAULT_PORT
+    description: "Puerto para la API web"
+    default: "8200"
+    required: false
+  - name: VAULT_TAG
+    description: "Tag de la imagen"
+    default: "latest"
+    required: false
+compose: |
+  services:
+    vault:
+      image: hashicorp/vault:${VAULT_TAG:-latest}
+      container_name: ${STACK_NAME}
+      ports:
+        - ${VAULT_PORT:-8200}:8200
+      volumes:
+        - ${STACK_NAME}_data:/vault/file
+      environment:
+        - VAULT_ADDR=http://localhost:8200
+      cap_add:
+        - IPC_LOCK
+      command: server
+      restart: unless-stopped

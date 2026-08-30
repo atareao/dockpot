@@ -1,0 +1,28 @@
+name: qdrant
+description: "Qdrant - Vector similarity search engine"
+category: "database"
+variables:
+  - name: QDRANT_PORT
+    description: "REST API port"
+    default: "6333"
+    required: false
+  - name: QDRANT_GRPC_PORT
+    description: "gRPC API port"
+    default: "6334"
+    required: false
+  - name: QDRANT_TAG
+    description: "Qdrant image tag"
+    default: "latest"
+    required: false
+compose: |
+  services:
+    qdrant:
+      container_name: ${STACK_NAME}
+      image: qdrant/qdrant:${QDRANT_TAG}
+      init: true
+      restart: unless-stopped
+      volumes:
+        - ${STACK_NAME}_storage:/qdrant/storage
+      ports:
+        - "${QDRANT_PORT}:6333"
+        - "${QDRANT_GRPC_PORT}:6334"
