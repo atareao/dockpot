@@ -5,6 +5,7 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use dockpot::auth;
+use dockpot::auth::DevMode;
 use dockpot::config::Config;
 use dockpot::db::Database;
 use dockpot::embed::serve_embedded;
@@ -16,6 +17,7 @@ async fn main() {
     dotenvy::dotenv().ok();
 
     let config = Config::load();
+    let dev_mode = config.is_dev_mode();
 
     // ───── Tracing ─────
     let env_filter =
@@ -41,21 +43,31 @@ async fn main() {
 
     tracing::info!("🚀 Dockpot starting...");
 
+    if dev_mode {
+        tracing::warn!("⚠️  Modo dev sin OIDC — autenticación desactivada");
+    }
+
     // ───── Connectivity verification ─────
-    let check_client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(5))
-        .build()
-        .unwrap();
-    match check_client
-        .get(format!(
-            "{}/.well-known/openid-configuration",
-            config.oidc_issuer_url.trim_end_matches('/')
-        ))
-        .send()
-        .await
-    {
-        Ok(_) => tracing::info!("✅ OIDC provider reachable"),
-        Err(e) => tracing::warn!("⚠️  OIDC provider not reachable: {} (will retry)", e),
+    if !dev_mode {
+        let check_client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .unwrap();
+        match check_client
+            .get(format!(
+                "{}/.well-known/openid-configuration",
+                config
+                    .oidc_issuer_url
+                    .as_deref()
+                    .unwrap()
+                    .trim_end_matches('/')
+            ))
+            .send()
+            .await
+        {
+            Ok(_) => tracing::info!("✅ OIDC provider reachable"),
+            Err(e) => tracing::warn!("⚠️  OIDC provider not reachable: {} (will retry)", e),
+        }
     }
 
     // ───── Data directory ─────
@@ -76,28 +88,60 @@ async fn main() {
     };
 
     // ───── Docker client ─────
-    let docker = Docker::connect_with_local_defaults().expect("Failed to connect to Docker daemon");
-    tracing::info!("🐳 Docker connected");
+    // connect_with_local_defaults() reads DOCKER_HOST env var automatically
+    let docker = Docker::connect_with_local_defaults()
+        .expect("Failed to connect to Docker daemon (is the socket accessible?)");
 
-    // ───── OIDC (mandatory) ─────
-    let oidc_metadata = match auth::discover_oidc(&config).await {
-        Ok(m) => {
-            tracing::info!("✅ OIDC discovery: {}", m.issuer);
-            m
+    // Ping to confirm connectivity
+    match docker.ping().await {
+        Ok(_) => tracing::info!("🐳 Docker daemon reachable"),
+        Err(e) => tracing::info!("🐳 Docker connected (ping: {e})"),
+    }
+
+    // ───── OIDC (optional — skipped in dev mode) ─────
+    let oidc_metadata = if !dev_mode {
+        match auth::discover_oidc(
+            config
+                .oidc_issuer_url
+                .as_deref()
+                .expect("OIDC_ISSUER_URL must be set in non-dev mode"),
+        )
+        .await
+        {
+            Ok(m) => {
+                tracing::info!("✅ OIDC discovery: {}", m.issuer);
+                Some(m)
+            }
+            Err(e) => {
+                tracing::error!("❌ OIDC discovery failed: {}", e);
+                std::process::exit(1);
+            }
         }
-        Err(e) => {
-            tracing::error!("❌ OIDC discovery failed: {}", e);
-            std::process::exit(1);
-        }
+    } else {
+        None
     };
 
     // ───── JWKS ─────
-    let jwt_validator = JwtValidator::new(&config.oidc_issuer_url, &config.oidc_client_id);
-    if let Err(e) = jwt_validator.fetch_jwks().await {
-        tracing::error!("❌ JWKS fetch failed: {}", e);
-        std::process::exit(1);
-    }
-    tracing::info!("✅ JWKS loaded");
+    let jwt_validator = if !dev_mode {
+        let validator = JwtValidator::new(
+            config
+                .oidc_issuer_url
+                .as_deref()
+                .expect("OIDC_ISSUER_URL must be set in non-dev mode"),
+            config
+                .oidc_client_id
+                .as_deref()
+                .expect("OIDC_CLIENT_ID must be set in non-dev mode"),
+        );
+        if let Err(e) = validator.fetch_jwks().await {
+            tracing::error!("❌ JWKS fetch failed: {}", e);
+            std::process::exit(1);
+        }
+        tracing::info!("✅ JWKS loaded");
+        validator
+    } else {
+        JwtValidator::new("", "")
+    };
 
     // ───── Broadcast channels ─────
     let (tx, _) = tokio::sync::broadcast::channel(256);
@@ -113,9 +157,10 @@ async fn main() {
         update_tx,
         notif_tx,
         oidc_states: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
-        oidc_metadata: Some(oidc_metadata),
+        oidc_metadata,
         jwt_validator,
         cached_containers: Arc::new(tokio::sync::RwLock::new(None)),
+        dev_mode,
     };
 
     // ───── Sync Scheduler ─────
@@ -154,7 +199,7 @@ async fn main() {
     });
 
     // ───── Router ─────
-    let client_secret = config.oidc_client_secret.clone();
+    let client_secret = config.oidc_client_secret.clone().unwrap_or_default();
     let app = routes::api_routes()
         .layer(CorsLayer::permissive())
         .layer(axum::middleware::from_fn(
@@ -164,6 +209,9 @@ async fn main() {
                 let secret = client_secret.clone();
                 async move {
                     req.extensions_mut().insert(secret);
+                    if dev_mode {
+                        req.extensions_mut().insert(DevMode);
+                    }
                     auth::auth_middleware(headers, req, next).await
                 }
             },

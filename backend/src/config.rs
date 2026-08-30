@@ -9,9 +9,10 @@ pub struct Config {
     pub log_level: String,
     pub log_format: String,
     pub stacks_dir: PathBuf,
-    pub oidc_issuer_url: String,
-    pub oidc_client_id: String,
-    pub oidc_client_secret: String,
+    pub templates_dir: PathBuf,
+    pub oidc_issuer_url: Option<String>,
+    pub oidc_client_id: Option<String>,
+    pub oidc_client_secret: Option<String>,
     pub oidc_redirect_url: String,
 }
 
@@ -25,11 +26,16 @@ impl Config {
             log_level: env_or("RUST_LOG", "info"),
             log_format: env_or("LOG_FORMAT", "pretty"),
             stacks_dir: PathBuf::from(env_or("STACKS_DIR", "./data/stacks")),
-            oidc_issuer_url: env_required("OIDC_ISSUER_URL"),
-            oidc_client_id: env_required("OIDC_CLIENT_ID"),
-            oidc_client_secret: env_required("OIDC_CLIENT_SECRET"),
+            templates_dir: PathBuf::from(env_or("TEMPLATES_DIR", "./templates")),
+            oidc_issuer_url: env_optional("OIDC_ISSUER_URL"),
+            oidc_client_id: env_optional("OIDC_CLIENT_ID"),
+            oidc_client_secret: env_optional("OIDC_CLIENT_SECRET"),
             oidc_redirect_url: env_or("OIDC_REDIRECT_URL", "http://localhost:3056/auth/callback"),
         }
+    }
+
+    pub fn is_dev_mode(&self) -> bool {
+        self.oidc_issuer_url.is_none()
     }
 }
 
@@ -37,15 +43,18 @@ pub fn env_or(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
 }
 
+pub fn env_optional(key: &str) -> Option<String> {
+    match std::env::var(key) {
+        Ok(v) if !v.is_empty() => Some(v),
+        _ => None,
+    }
+}
+
 pub fn env_or_parsed<T: std::str::FromStr>(key: &str, default: T) -> T {
     std::env::var(key)
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(default)
-}
-
-pub fn env_required(key: &str) -> String {
-    std::env::var(key).unwrap_or_else(|_| panic!("OIDC env var {} is required", key))
 }
 
 #[cfg(test)]
@@ -84,15 +93,60 @@ mod tests {
     }
 
     #[test]
-    fn test_env_required_value() {
-        std::env::set_var("OIDC_REQ_TEST", "v");
-        assert_eq!(env_required("OIDC_REQ_TEST"), "v");
-        std::env::remove_var("OIDC_REQ_TEST");
+    fn test_env_optional_unset() {
+        std::env::remove_var("OPT_UNSET");
+        assert_eq!(env_optional("OPT_UNSET"), None);
     }
 
     #[test]
-    #[should_panic]
-    fn test_env_required_panics() {
-        env_required("OIDC_UNSET_XYZ");
+    fn test_env_optional_empty() {
+        std::env::set_var("OPT_EMPTY", "");
+        assert_eq!(env_optional("OPT_EMPTY"), None);
+        std::env::remove_var("OPT_EMPTY");
+    }
+
+    #[test]
+    fn test_env_optional_value() {
+        std::env::set_var("OPT_VAL", "hello");
+        assert_eq!(env_optional("OPT_VAL"), Some("hello".to_string()));
+        std::env::remove_var("OPT_VAL");
+    }
+
+    #[test]
+    fn test_is_dev_mode_true_when_no_issuer() {
+        let config = Config {
+            host: "0.0.0.0".into(),
+            port: 3056,
+            data_dir: "./data".into(),
+            database_url: "./data/dockpot.db".into(),
+            log_level: "info".into(),
+            log_format: "pretty".into(),
+            stacks_dir: "./data/stacks".into(),
+            templates_dir: "./templates".into(),
+            oidc_issuer_url: None,
+            oidc_client_id: None,
+            oidc_client_secret: None,
+            oidc_redirect_url: "http://localhost:3056/auth/callback".into(),
+        };
+        assert!(config.is_dev_mode());
+    }
+
+    #[test]
+    fn test_is_dev_mode_false_when_issuer_set() {
+        let config = Config {
+            host: "0.0.0.0".into(),
+            port: 3056,
+            data_dir: "./data".into(),
+            database_url: "./data/dockpot.db".into(),
+            log_level: "info".into(),
+            log_format: "pretty".into(),
+            stacks_dir: "./data/stacks".into(),
+            templates_dir: "./templates".into(),
+            oidc_issuer_url: Some("https://auth.example.com".into()),
+            oidc_client_id: Some("client-id".into()),
+            oidc_client_secret: Some("secret".into()),
+            oidc_redirect_url: "http://localhost:3056/auth/callback".into(),
+        };
+        assert!(!config.is_dev_mode());
     }
 }

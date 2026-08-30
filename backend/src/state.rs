@@ -206,6 +206,7 @@ pub struct AppState {
     pub oidc_metadata: Option<OidcMetadata>,
     pub jwt_validator: JwtValidator,
     pub cached_containers: CachedContainers,
+    pub dev_mode: bool,
 }
 
 impl axum::extract::FromRef<AppState> for Docker {

@@ -12,10 +12,13 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::config::Config;
 use crate::state::{AppState, JwtClaims};
 
-// ───── Session Claims ────────────────────────────────────────────
+// ───── Dev Mode Marker ─────────────────────────────────────────
+
+/// Marker type injected into request extensions in dev mode to skip auth.
+#[derive(Clone, Copy)]
+pub struct DevMode;
 
 /// Claims del JWT de sesión firmado con HMAC-SHA256 (client_secret como key).
 /// Es el token que viaja en la cookie `session`.
@@ -81,7 +84,7 @@ pub async fn auth_login(State(state): State<AppState>) -> Result<Redirect, AuthE
     let auth_url = format!(
         "{}?response_type=code&client_id={}&redirect_uri={}&scope=openid%20email%20profile&state={}&code_challenge={}&code_challenge_method=S256",
         metadata.authorization_endpoint,
-        state.config.oidc_client_id,
+        state.config.oidc_client_id.as_deref().unwrap_or_default(),
         redirect_uri,
         state_value,
         code_challenge,
@@ -116,8 +119,18 @@ pub async fn auth_callback(
         ("grant_type", "authorization_code"),
         ("code", &params.code),
         ("redirect_uri", &state.config.oidc_redirect_url),
-        ("client_id", &state.config.oidc_client_id),
-        ("client_secret", &state.config.oidc_client_secret),
+        (
+            "client_id",
+            state.config.oidc_client_id.as_deref().unwrap_or_default(),
+        ),
+        (
+            "client_secret",
+            state
+                .config
+                .oidc_client_secret
+                .as_deref()
+                .unwrap_or_default(),
+        ),
         ("code_verifier", &code_verifier),
     ];
 
@@ -186,7 +199,14 @@ pub async fn auth_callback(
     let session_token = encode(
         &Header::default(), // HS256 es el default
         &session_claims,
-        &EncodingKey::from_secret(state.config.oidc_client_secret.as_bytes()),
+        &EncodingKey::from_secret(
+            state
+                .config
+                .oidc_client_secret
+                .as_deref()
+                .unwrap_or_default()
+                .as_bytes(),
+        ),
     )
     .map_err(|e| AuthError::new(&format!("Failed to sign session JWT: {}", e)))?;
 
@@ -220,6 +240,18 @@ pub async fn auth_logout() -> Response {
 
 /// Devuelve información del usuario autenticado, o `{ authenticated: false }`.
 pub async fn auth_me(headers: HeaderMap, State(state): State<AppState>) -> Json<serde_json::Value> {
+    // Dev mode — return fake user
+    if state.dev_mode {
+        return Json(serde_json::json!({
+            "authenticated": true,
+            "user": {
+                "sub": "dev",
+                "email": "dev@local",
+                "name": "Dev User"
+            }
+        }));
+    }
+
     // Leer cookie `session`
     let session = headers
         .get("Cookie")
@@ -231,7 +263,14 @@ pub async fn auth_me(headers: HeaderMap, State(state): State<AppState>) -> Json<
         });
 
     if let Some(token) = session {
-        let key = DecodingKey::from_secret(state.config.oidc_client_secret.as_bytes());
+        let key = DecodingKey::from_secret(
+            state
+                .config
+                .oidc_client_secret
+                .as_deref()
+                .unwrap_or_default()
+                .as_bytes(),
+        );
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = true;
 
@@ -276,6 +315,19 @@ pub async fn auth_middleware(
     mut req: axum::extract::Request,
     next: Next,
 ) -> Result<Response, Response> {
+    // Dev mode — skip auth entirely
+    if req.extensions().get::<DevMode>().is_some() {
+        req.extensions_mut().insert(SessionClaims {
+            sub: "dev".to_string(),
+            email: Some("dev@local".to_string()),
+            name: Some("Dev User".to_string()),
+            exp: usize::MAX,
+            iat: 0,
+            last_active: 0,
+        });
+        return Ok(next.run(req).await);
+    }
+
     // ── Paths públicos (no requieren autenticación) ──
     let path = req.uri().path();
     let is_public = path == "/"
@@ -395,8 +447,8 @@ fn url_encode(s: &str) -> String {
 // ───── OIDC Discovery ────────────────────────────────────────────
 
 /// Descubre los endpoints OIDC a partir del issuer URL.
-pub async fn discover_oidc(config: &Config) -> anyhow::Result<crate::state::OidcMetadata> {
-    let issuer = config.oidc_issuer_url.trim_end_matches('/');
+pub async fn discover_oidc(issuer_url: &str) -> anyhow::Result<crate::state::OidcMetadata> {
+    let issuer = issuer_url.trim_end_matches('/');
     let well_known = format!("{}/.well-known/openid-configuration", issuer);
 
     let client = reqwest::Client::builder()
