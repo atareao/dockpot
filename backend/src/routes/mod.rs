@@ -1,13 +1,12 @@
-use std::sync::Arc;
-
 use axum::extract::State;
 use axum::routing;
 use axum::Router;
 
-use crate::auth::AppState;
+use crate::auth;
+use crate::containers;
+use crate::events;
+use crate::state::AppState;
 
-pub mod agents;
-pub mod auth_routes;
 pub mod backup;
 pub mod convert;
 pub mod docker_info;
@@ -21,14 +20,10 @@ pub mod stats;
 pub mod sync;
 pub mod templates;
 
-pub fn api_routes() -> Router<Arc<AppState>> {
-    let public = Router::new()
-        .route("/health", routing::get(health))
-        .route("/auth/login", routing::get(auth_routes::login))
-        .route("/auth/callback", routing::get(auth_routes::callback));
+pub fn api_routes() -> Router<AppState> {
+    let public = Router::new().route("/health", routing::get(health));
 
     let protected = Router::new()
-        .route("/api/me", routing::get(auth_routes::me))
         // Stacks
         .route(
             "/api/stacks",
@@ -36,16 +31,14 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         )
         .route(
             "/api/stacks/{id}",
-            routing::get(stacks::get)
-                .put(stacks::update)
-                .delete(stacks::delete),
+            routing::get(stacks::get).delete(stacks::delete),
         )
         .route("/api/stacks/{id}/start", routing::post(stacks::start))
         .route("/api/stacks/{id}/stop", routing::post(stacks::stop))
         .route("/api/stacks/{id}/restart", routing::post(stacks::restart))
         .route(
             "/api/stacks/{id}/compose",
-            routing::get(stacks::get_compose).put(stacks::update_compose),
+            routing::get(stacks::get_compose),
         )
         .route(
             "/api/stacks/validate",
@@ -54,21 +47,18 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         .route("/api/stacks/{id}/pull", routing::post(stacks::pull))
         .route(
             "/api/stacks/{id}/logs/ws",
-            routing::get(logs::logs_ws_handler),
+            routing::get(logs::logs_sse_handler),
         )
         .route("/api/stacks/{id}/logs", routing::get(log_history::get_logs))
         .route("/api/stacks/{id}/stats", routing::get(stats::stats))
         .route("/api/stacks/{id}/export", routing::get(export::export_zip))
-        .route("/api/status", routing::get(stacks::dashboard_status))
+        .route("/api/status", routing::get(stacks::list))
         .route("/api/docker/info", routing::get(docker_info::docker_info))
         // Env files
-        .route(
-            "/api/stacks/{id}/env",
-            routing::get(env::list).post(env::upsert),
-        )
+        .route("/api/stacks/{id}/env", routing::get(env::list))
         .route(
             "/api/stacks/{id}/env/{filename}",
-            routing::delete(env::delete),
+            routing::delete(env::list),
         )
         // Notifiers
         .route(
@@ -83,17 +73,6 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         .route(
             "/api/stacks/{id}/notifiers",
             routing::get(notifiers::get_stack_notifiers).post(notifiers::set_stack_notifiers),
-        )
-        // Agents
-        .route(
-            "/api/agents",
-            routing::get(agents::list).post(agents::create),
-        )
-        .route(
-            "/api/agents/{id}",
-            routing::get(agents::get)
-                .put(agents::update)
-                .delete(agents::delete),
         )
         // Convert
         .route(
@@ -127,10 +106,15 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         .route("/api/stacks/{id}/sync/diff", routing::get(sync::diff))
         .route("/api/stacks/{id}/sync/status", routing::get(sync::status));
 
-    public.merge(protected).merge(sync_routes)
+    public
+        .merge(auth::routes())
+        .merge(containers::routes())
+        .merge(events::routes())
+        .merge(protected)
+        .merge(sync_routes)
 }
 
-pub async fn health(State(state): State<Arc<AppState>>) -> axum::Json<serde_json::Value> {
+pub async fn health(State(state): State<AppState>) -> axum::Json<serde_json::Value> {
     let docker_ok = tokio::process::Command::new("docker")
         .args(["info"])
         .output()

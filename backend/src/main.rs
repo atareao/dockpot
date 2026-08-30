@@ -1,29 +1,15 @@
 use std::sync::Arc;
 
+use bollard::Docker;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use dockpot::auth::{self, AppState, JwtValidator};
+use dockpot::auth;
 use dockpot::config::Config;
 use dockpot::db::Database;
 use dockpot::embed::serve_embedded;
 use dockpot::routes;
-
-fn is_public_path(path: &str) -> bool {
-    path == "/"
-        || path == "/health"
-        || path.starts_with("/auth/")
-        || path.starts_with("/assets/")
-        || path.ends_with(".html")
-        || path.ends_with(".js")
-        || path.ends_with(".css")
-        || path.ends_with(".png")
-        || path.ends_with(".ico")
-        || path.ends_with(".svg")
-        || path.ends_with(".woff2")
-        || path.ends_with(".woff")
-        || path.ends_with(".ttf")
-}
+use dockpot::state::{AppState, JwtValidator};
 
 #[tokio::main]
 async fn main() {
@@ -61,7 +47,7 @@ async fn main() {
         .build()
         .unwrap();
     match check_client
-        .get(&format!(
+        .get(format!(
             "{}/.well-known/openid-configuration",
             config.oidc_issuer_url.trim_end_matches('/')
         ))
@@ -89,6 +75,10 @@ async fn main() {
         }
     };
 
+    // ───── Docker client ─────
+    let docker = Docker::connect_with_local_defaults().expect("Failed to connect to Docker daemon");
+    tracing::info!("🐳 Docker connected");
+
     // ───── OIDC (mandatory) ─────
     let oidc_metadata = match auth::discover_oidc(&config).await {
         Ok(m) => {
@@ -103,23 +93,30 @@ async fn main() {
 
     // ───── JWKS ─────
     let jwt_validator = JwtValidator::new(&config.oidc_issuer_url, &config.oidc_client_id);
-    if let Err(e) = jwt_validator.fetch_jwks(&oidc_metadata.jwks_uri).await {
+    if let Err(e) = jwt_validator.fetch_jwks().await {
         tracing::error!("❌ JWKS fetch failed: {}", e);
         std::process::exit(1);
     }
-    let jwt_validator = Arc::new(jwt_validator);
+    tracing::info!("✅ JWKS loaded");
+
+    // ───── Broadcast channels ─────
+    let (tx, _) = tokio::sync::broadcast::channel(256);
+    let (update_tx, _) = tokio::sync::broadcast::channel(256);
+    let (notif_tx, _) = tokio::sync::broadcast::channel(256);
 
     // ───── App State ─────
-    let (event_tx, _) = tokio::sync::broadcast::channel(auth::SSE_CHANNEL_CAPACITY);
-
-    let app_state = Arc::new(AppState {
+    let app_state = AppState {
+        docker: docker.clone(),
         config: config.clone(),
         db: db.clone(),
-        oidc_metadata: Some(oidc_metadata),
-        jwt_validator: jwt_validator.clone(),
+        tx,
+        update_tx,
+        notif_tx,
         oidc_states: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
-        event_tx: event_tx.clone(),
-    });
+        oidc_metadata: Some(oidc_metadata),
+        jwt_validator,
+        cached_containers: Arc::new(tokio::sync::RwLock::new(None)),
+    };
 
     // ───── Sync Scheduler ─────
     let db_for_sync = db.clone();
@@ -133,20 +130,41 @@ async fn main() {
         backup_scheduler_loop(db_for_backup).await;
     });
 
+    // ───── State worker ─────
+    let docker_for_worker = docker.clone();
+    let tx_for_worker = app_state.tx.clone();
+    let notif_tx_for_worker = app_state.notif_tx.clone();
+    let cached_for_worker = app_state.cached_containers.clone();
+    let db_for_worker = db.clone();
+    tokio::spawn(async move {
+        dockpot::workers::state_worker(
+            docker_for_worker,
+            db_for_worker,
+            tx_for_worker,
+            cached_for_worker,
+            notif_tx_for_worker,
+        )
+        .await;
+    });
+
+    // ───── Cleanup worker ─────
+    let docker_for_cleanup = docker.clone();
+    tokio::spawn(async move {
+        dockpot::workers::cleanup_worker(docker_for_cleanup).await;
+    });
+
     // ───── Router ─────
-    let state_for_middleware = app_state.clone();
+    let client_secret = config.oidc_client_secret.clone();
     let app = routes::api_routes()
         .layer(CorsLayer::permissive())
         .layer(axum::middleware::from_fn(
-            move |mut req: axum::extract::Request, next: axum::middleware::Next| {
-                let state = state_for_middleware.clone();
+            move |headers: axum::http::HeaderMap,
+                  mut req: axum::extract::Request,
+                  next: axum::middleware::Next| {
+                let secret = client_secret.clone();
                 async move {
-                    let path = req.uri().path().to_string();
-                    req.extensions_mut().insert(state);
-                    if is_public_path(&path) {
-                        return Ok(next.run(req).await);
-                    }
-                    dockpot::auth::require_auth(req, next).await
+                    req.extensions_mut().insert(secret);
+                    auth::auth_middleware(headers, req, next).await
                 }
             },
         ))

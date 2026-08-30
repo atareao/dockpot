@@ -1,14 +1,12 @@
-use std::sync::Arc;
-
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use serde_json::Value;
 
-use crate::auth::AppState;
+use crate::state::AppState;
 
 pub async fn docker_info(
-    State(_state): State<Arc<AppState>>,
+    State(_state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     let version = tokio::process::Command::new("docker")
         .args(["version", "--format", "{{.Server.Version}}"])
