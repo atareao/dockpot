@@ -6,6 +6,7 @@ pub mod db;
 pub mod embed;
 pub mod events;
 pub mod git;
+pub mod label_templates;
 pub mod models;
 pub mod notifier;
 pub mod routes;

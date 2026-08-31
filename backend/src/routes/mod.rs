@@ -10,8 +10,10 @@ use crate::state::AppState;
 pub mod backup;
 pub mod convert;
 pub mod docker_info;
+pub mod docker_resources;
 pub mod env;
 pub mod export;
+pub mod label_templates;
 pub mod log_history;
 pub mod logs;
 pub mod notifiers;
@@ -65,6 +67,8 @@ pub fn api_routes() -> Router<AppState> {
         .route("/api/stacks/{id}/export", routing::get(export::export_zip))
         .route("/api/status", routing::get(stacks::list))
         .route("/api/docker/info", routing::get(docker_info::docker_info))
+        .merge(docker_resources::routes())
+        .merge(label_templates::routes())
         // Env files
         .route(
             "/api/stacks/{id}/env",
