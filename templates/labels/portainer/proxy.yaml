@@ -1,0 +1,19 @@
+name: portainer-proxy
+description: "Portainer proxy labels (Traefik)"
+category: "portainer"
+labels:
+  traefik.enable: "true"
+  traefik.http.routers.${SERVICE_NAME}.rule: "Host(`${HOSTNAME}`)"
+  traefik.http.routers.${SERVICE_NAME}.entrypoints: "websecure"
+  traefik.http.routers.${SERVICE_NAME}.tls: "true"
+  traefik.http.routers.${SERVICE_NAME}.tls.certresolver: "letsencrypt"
+  traefik.http.services.${SERVICE_NAME}.loadbalancer.server.port: "${PORT}"
+variables:
+  - name: HOSTNAME
+    description: "Portainer domain"
+    default: "portainer.example.com"
+    required: true
+  - name: PORT
+    description: "Container port"
+    default: "9000"
+    required: true

@@ -1,0 +1,15 @@
+name: caddy-reverse-proxy
+description: "Caddy reverse proxy with domain"
+category: "caddy"
+labels:
+  caddy: "${HOSTNAME}"
+  caddy.reverse_proxy: "{{upstreams ${PORT}}}"
+variables:
+  - name: HOSTNAME
+    description: "Domain name"
+    default: "example.com"
+    required: true
+  - name: PORT
+    description: "Container port"
+    default: "80"
+    required: true

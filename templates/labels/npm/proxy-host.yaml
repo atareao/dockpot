@@ -1,0 +1,15 @@
+name: npm-proxy-host
+description: "Nginx Proxy Manager proxy host"
+category: "npm"
+labels:
+  VIRTUAL_HOST: "${HOSTNAME}"
+  VIRTUAL_PORT: "${PORT}"
+variables:
+  - name: HOSTNAME
+    description: "Domain name"
+    default: "example.com"
+    required: true
+  - name: PORT
+    description: "Container port"
+    default: "80"
+    required: true

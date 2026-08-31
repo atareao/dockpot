@@ -1,0 +1,20 @@
+name: traefik-rate-limit
+description: "Rate limiting middleware"
+category: "traefik"
+labels:
+  traefik.http.middlewares.${SERVICE_NAME}-ratelimit.ratelimit.average: "${AVERAGE}"
+  traefik.http.middlewares.${SERVICE_NAME}-ratelimit.ratelimit.burst: "${BURST}"
+  traefik.http.middlewares.${SERVICE_NAME}-ratelimit.ratelimit.period: "${PERIOD}"
+variables:
+  - name: AVERAGE
+    description: "Average requests per period"
+    default: "100"
+    required: true
+  - name: BURST
+    description: "Maximum burst"
+    default: "200"
+    required: true
+  - name: PERIOD
+    description: "Time period (e.g. 1m, 1s)"
+    default: "1m"
+    required: false

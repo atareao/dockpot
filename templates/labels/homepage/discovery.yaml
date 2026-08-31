@@ -1,0 +1,25 @@
+name: homepage-discovery
+description: "Homepage service discovery labels"
+category: "homepage"
+labels:
+  gethomepage.name: "${DISPLAY_NAME}"
+  gethomepage.icon: "${ICON}"
+  gethomepage.group: "${GROUP}"
+  gethomepage.description: "${DESCRIPTION}"
+variables:
+  - name: DISPLAY_NAME
+    description: "Display name in Homepage"
+    default: "My Service"
+    required: true
+  - name: ICON
+    description: "Icon name (e.g. nginx, docker)"
+    default: "docker"
+    required: false
+  - name: GROUP
+    description: "Group name in Homepage"
+    default: "Services"
+    required: false
+  - name: DESCRIPTION
+    description: "Short description"
+    default: ""
+    required: false

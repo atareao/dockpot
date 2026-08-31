@@ -1,0 +1,17 @@
+name: traefik-http
+description: "Basic HTTP route with entrypoint web"
+category: "traefik"
+labels:
+  traefik.enable: "true"
+  traefik.http.routers.${SERVICE_NAME}.rule: "Host(`${HOSTNAME}`)"
+  traefik.http.routers.${SERVICE_NAME}.entrypoints: "web"
+  traefik.http.services.${SERVICE_NAME}.loadbalancer.server.port: "${PORT}"
+variables:
+  - name: HOSTNAME
+    description: "Domain name (e.g. app.example.com)"
+    default: "example.com"
+    required: true
+  - name: PORT
+    description: "Container port"
+    default: "80"
+    required: true

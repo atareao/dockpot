@@ -1,0 +1,21 @@
+name: traefik-dashboard
+description: "Traefik Dashboard with auth"
+category: "traefik"
+labels:
+  traefik.enable: "true"
+  traefik.http.routers.dashboard.rule: "Host(`${HOSTNAME}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+  traefik.http.routers.dashboard.entrypoints: "websecure"
+  traefik.http.routers.dashboard.tls: "true"
+  traefik.http.routers.dashboard.tls.certresolver: "letsencrypt"
+  traefik.http.routers.dashboard.middlewares: "dashboard-auth"
+  traefik.http.routers.dashboard.service: "api@internal"
+  traefik.http.middlewares.dashboard-auth.basicauth.users: "${AUTH_USERS}"
+variables:
+  - name: HOSTNAME
+    description: "Dashboard domain"
+    default: "traefik.example.com"
+    required: true
+  - name: AUTH_USERS
+    description: "Basic auth users"
+    default: "admin:$2y$10$..."
+    required: true

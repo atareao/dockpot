@@ -229,4 +229,26 @@ export const api = {
 
   // Stats
   getStackStats: (id: string) => request<StackStats>(`/api/stacks/${id}/stats`),
+
+  // Docker resources
+  listDockerVolumes: () => request<{ name: string; driver: string; mountpoint: string }[]>('/api/docker/volumes'),
+  listDockerNetworks: () => request<{ id: string; name: string; driver: string; scope: string; internal: boolean }[]>('/api/docker/networks'),
+  listDockerConfigs: () => request<{ id: string; name: string; created_at: string; updated_at: string }[]>('/api/docker/configs'),
+  listDockerSecrets: () => request<{ id: string; name: string; created_at: string; updated_at: string }[]>('/api/docker/secrets'),
+
+  // Label templates
+  listLabelTemplates: () => request<Record<string, LabelTemplate[]>>('/api/templates/labels'),
+  renderLabelTemplate: (template: string, serviceName: string, variables: Record<string, string>) =>
+    request<{ labels: Record<string, string> }>('/api/templates/labels/render', {
+      method: 'POST',
+      body: JSON.stringify({ template, service_name: serviceName, variables }),
+    }),
 };
+
+export interface LabelTemplate {
+  name: string;
+  description: string;
+  category: string;
+  labels: Record<string, string>;
+  variables: { name: string; description: string; default: string; required: boolean }[];
+}
