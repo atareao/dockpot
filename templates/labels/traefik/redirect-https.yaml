@@ -1,0 +1,15 @@
+name: traefik-redirect-https
+description: "Redirect HTTP to HTTPS"
+category: "traefik"
+labels:
+  traefik.enable: "true"
+  traefik.http.routers.${SERVICE_NAME}-redirect.rule: "Host(`${HOSTNAME}`)"
+  traefik.http.routers.${SERVICE_NAME}-redirect.entrypoints: "web"
+  traefik.http.routers.${SERVICE_NAME}-redirect.middlewares: "${SERVICE_NAME}-redirect"
+  traefik.http.middlewares.${SERVICE_NAME}-redirect.redirectscheme.scheme: "https"
+  traefik.http.middlewares.${SERVICE_NAME}-redirect.redirectscheme.permanent: "true"
+variables:
+  - name: HOSTNAME
+    description: "Domain name to redirect"
+    default: "example.com"
+    required: true

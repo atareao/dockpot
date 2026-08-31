@@ -1,0 +1,15 @@
+name: adguard-proxy
+description: "AdGuard Home proxy labels"
+category: "adguard"
+labels:
+  VIRTUAL_HOST: "${HOSTNAME}"
+  VIRTUAL_PORT: "${PORT}"
+variables:
+  - name: HOSTNAME
+    description: "AdGuard domain"
+    default: "adguard.example.com"
+    required: true
+  - name: PORT
+    description: "Container port"
+    default: "80"
+    required: true

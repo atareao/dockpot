@@ -1,0 +1,11 @@
+name: watchtower-webhook
+description: "Watchtower auto-update with webhook notifications"
+category: "watchtower"
+labels:
+  com.centurylinklabs.watchtower.enable: "true"
+  com.centurylinklabs.watchtower.webhook-url: "${WEBHOOK_URL}"
+variables:
+  - name: WEBHOOK_URL
+    description: "Webhook URL for notifications"
+    default: "https://hooks.example.com/watchtower"
+    required: true

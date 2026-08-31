@@ -1,0 +1,21 @@
+name: npm-ssl-proxy
+description: "Nginx Proxy Manager SSL proxy"
+category: "npm"
+labels:
+  VIRTUAL_HOST: "${HOSTNAME}"
+  VIRTUAL_PORT: "${PORT}"
+  LETSENCRYPT_HOST: "${HOSTNAME}"
+  LETSENCRYPT_EMAIL: "${EMAIL}"
+variables:
+  - name: HOSTNAME
+    description: "Domain name"
+    default: "example.com"
+    required: true
+  - name: PORT
+    description: "Container port"
+    default: "80"
+    required: true
+  - name: EMAIL
+    description: "Email for Let's Encrypt"
+    default: "admin@example.com"
+    required: true

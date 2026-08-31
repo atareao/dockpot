@@ -1,0 +1,32 @@
+name: traefik-api-gateway
+description: "API route with StripPrefix and CORS headers"
+category: "traefik"
+labels:
+  traefik.enable: "true"
+  traefik.http.routers.${SERVICE_NAME}.rule: "Host(`${HOSTNAME}`) && PathPrefix(`${PATH_PREFIX}`)"
+  traefik.http.routers.${SERVICE_NAME}.entrypoints: "websecure"
+  traefik.http.routers.${SERVICE_NAME}.tls: "true"
+  traefik.http.routers.${SERVICE_NAME}.tls.certresolver: "letsencrypt"
+  traefik.http.routers.${SERVICE_NAME}.middlewares: "${SERVICE_NAME}-stripprefix,${SERVICE_NAME}-cors"
+  traefik.http.middlewares.${SERVICE_NAME}-stripprefix.stripprefix.prefixes: "${PATH_PREFIX}"
+  traefik.http.middlewares.${SERVICE_NAME}-cors.headers.accesscontrolalloworiginlist: "${CORS_ORIGIN}"
+  traefik.http.middlewares.${SERVICE_NAME}-cors.headers.accesscontrolallowmethods: "GET,POST,PUT,DELETE,OPTIONS"
+  traefik.http.middlewares.${SERVICE_NAME}-cors.headers.accesscontrolallowheaders: "Content-Type,Authorization"
+  traefik.http.services.${SERVICE_NAME}.loadbalancer.server.port: "${PORT}"
+variables:
+  - name: HOSTNAME
+    description: "Domain name"
+    default: "api.example.com"
+    required: true
+  - name: PORT
+    description: "Container port"
+    default: "80"
+    required: true
+  - name: PATH_PREFIX
+    description: "API path prefix (e.g. /api/v1)"
+    default: "/api"
+    required: true
+  - name: CORS_ORIGIN
+    description: "Allowed CORS origin (* for all)"
+    default: "*"
+    required: false

@@ -1,0 +1,6 @@
+name: watchtower-auto-update
+description: "Enable Watchtower auto-updates"
+category: "watchtower"
+labels:
+  com.centurylinklabs.watchtower.enable: "true"
+variables: []

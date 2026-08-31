@@ -1,0 +1,12 @@
+name: caddy-static-file
+description: "Caddy static file server"
+category: "caddy"
+labels:
+  caddy: "${HOSTNAME}"
+  caddy.root: "* /usr/share/caddy/html"
+  caddy.file_server: "*"
+variables:
+  - name: HOSTNAME
+    description: "Domain name"
+    default: "static.example.com"
+    required: true
