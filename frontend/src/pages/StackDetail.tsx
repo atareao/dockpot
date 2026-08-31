@@ -1,24 +1,57 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Typography, Spin, Button, Space, Tag, Card, Descriptions, App as AntApp, Layout,
-  Alert, Switch, Modal, Tabs, Divider, Dropdown,
+  Alert, Modal, Tabs, Dropdown, Segmented,
 } from 'antd';
 import { ArrowLeftOutlined, PlayCircleOutlined, StopOutlined, ReloadOutlined,
   CloudUploadOutlined, CheckCircleOutlined, CloseCircleOutlined,
   DownloadOutlined, GithubOutlined, CodeOutlined, MoreOutlined,
 } from '@ant-design/icons';
 import { api, Stack, StackSync } from '../api/http';
+import type { EnvFileData } from '../components/visual/EnvFileList';
 import { YamlEditor } from '../components/YamlEditor';
 import { Terminal } from '../components/Terminal';
 import { DiffViewer } from '../components/DiffViewer';
 import { useTheme } from '../main';
+import { load, dump } from 'js-yaml';
+import type { ComposeDefinition } from '../types/compose';
+import ServiceList from '../components/visual/ServiceList';
+import VolumeList from '../components/visual/VolumeList';
+import NetworkList from '../components/visual/NetworkList';
+import ConfigSecretList from '../components/visual/ConfigSecretList';
+import EnvFileList from '../components/visual/EnvFileList';
 
 const { Title, Text } = Typography;
 const { Content, Header } = Layout;
 
-function isMobile() {
-  return window.innerWidth < 768;
+/** Parse YAML → ComposeDefinition */
+function parseCompose(yaml: string): ComposeDefinition | null {
+  if (!yaml || !yaml.trim()) return null;
+  try {
+    const parsed = load(yaml) as any;
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!parsed.services || typeof parsed.services !== 'object') parsed.services = {};
+    parsed.volumes = parsed.volumes || {};
+    parsed.networks = parsed.networks || {};
+    parsed.configs = parsed.configs || {};
+    parsed.secrets = parsed.secrets || {};
+    return parsed as ComposeDefinition;
+  } catch {
+    return null;
+  }
+}
+
+/** Serialize ComposeDefinition → YAML */
+function serializeCompose(def: ComposeDefinition): string {
+  const cleaned = { ...def };
+  for (const key of ['volumes', 'networks', 'configs', 'secrets'] as const) {
+    const k = key as keyof ComposeDefinition;
+    if (cleaned[k] && typeof cleaned[k] === 'object' && Object.keys(cleaned[k] as object).length === 0) {
+      delete cleaned[k];
+    }
+  }
+  return dump(cleaned, { indent: 2, lineWidth: -1, noRefs: true, sortKeys: false, forceQuotes: false });
 }
 
 export function StackDetail() {
@@ -32,21 +65,20 @@ export function StackDetail() {
   const [pulling, setPulling] = useState(false);
   const [syncConfig, setSyncConfig] = useState<StackSync | null>(null);
   const [syncModalOpen, setSyncModalOpen] = useState(false);
-  const [envFiles, setEnvFiles] = useState<any[]>([]);
+  const [envFiles, setEnvFiles] = useState<EnvFileData[]>([]);
   const [notifiers, setNotifiers] = useState<any[]>([]);
   const [stackNotifiers, setStackNotifiers] = useState<string[]>([]);
   const [stats, setStats] = useState<any>(null);
-  const [notifierModalOpen, setNotifierModalOpen] = useState(false);
-  const [envContent, setEnvContent] = useState('');
-  const [envFilename, setEnvFilename] = useState('.env');
   const [diffModalOpen, setDiffModalOpen] = useState(false);
   const [diffData, setDiffData] = useState<any>(null);
-  const [editMode, setEditMode] = useState(false);
+  const [mode, setMode] = useState<'raw' | 'visual'>('raw');
   const [yamlValid, setYamlValid] = useState(true);
   const [yamlErrors, setYamlErrors] = useState<string[]>([]);
   const { message } = AntApp.useApp();
   const navigate = useNavigate();
   const { darkMode } = useTheme();
+
+  // ── Data loading ──
 
   const loadStack = useCallback(async () => {
     if (!id) return;
@@ -86,6 +118,64 @@ export function StackDetail() {
 
   useEffect(() => { if (id) { loadEnvFiles(); loadNotifiers(); loadStats(); } }, [id]);
 
+  // ── Parse compose for visual mode ──
+
+  const definition = useMemo(() => {
+    if (mode !== 'visual') return null;
+    return parseCompose(compose);
+  }, [compose, mode]);
+
+  const handleComposeChange = useCallback((updated: ComposeDefinition) => {
+    try {
+      const yaml = serializeCompose(updated);
+      setCompose(yaml);
+    } catch {}
+  }, []);
+
+  // ── Handlers for each section ──
+
+  const handleServicesChange = useCallback(
+    (services: ComposeDefinition['services']) => {
+      if (!definition) return;
+      handleComposeChange({ ...definition, services });
+    },
+    [definition, handleComposeChange],
+  );
+
+  const handleVolumesChange = useCallback(
+    (volumes: ComposeDefinition['volumes']) => {
+      if (!definition) return;
+      handleComposeChange({ ...definition, volumes });
+    },
+    [definition, handleComposeChange],
+  );
+
+  const handleNetworksChange = useCallback(
+    (networks: ComposeDefinition['networks']) => {
+      if (!definition) return;
+      handleComposeChange({ ...definition, networks });
+    },
+    [definition, handleComposeChange],
+  );
+
+  const handleConfigsChange = useCallback(
+    (configs: ComposeDefinition['configs']) => {
+      if (!definition) return;
+      handleComposeChange({ ...definition, configs });
+    },
+    [definition, handleComposeChange],
+  );
+
+  const handleSecretsChange = useCallback(
+    (secrets: ComposeDefinition['secrets']) => {
+      if (!definition) return;
+      handleComposeChange({ ...definition, secrets });
+    },
+    [definition, handleComposeChange],
+  );
+
+  // ── Actions ──
+
   const handleShowDiff = async () => {
     if (!id) return;
     try {
@@ -121,7 +211,7 @@ export function StackDetail() {
       await api.updateCompose(id, compose);
       setOriginalCompose(compose);
       message.success('Compose saved');
-      setEditMode(false);
+      setMode("raw");
     } catch (e: any) {
       message.error('Error: ' + e.message);
     } finally {
@@ -135,7 +225,6 @@ export function StackDetail() {
       message.error('Fix YAML errors before deploying');
       return;
     }
-
     Modal.confirm({
       title: `Deploy '${stack.name}'?`,
       content: compose !== originalCompose
@@ -150,7 +239,7 @@ export function StackDetail() {
             setOriginalCompose(compose);
           }
           await api.startStack(id);
-          setEditMode(false);
+          setMode("raw");
           loadStack();
           message.success(`🚀 '${stack.name}' deployed`);
         } catch (e: any) {
@@ -192,8 +281,179 @@ export function StackDetail() {
 
   const hasChanges = compose !== originalCompose;
 
+  // ── Volume & network names for ServiceCard ──
+
+  const volumeNames = useMemo(
+    () => (definition?.volumes ? Object.keys(definition.volumes) : []),
+    [definition?.volumes],
+  );
+  const networkNames = useMemo(
+    () => (definition?.networks ? Object.keys(definition.networks) : []),
+    [definition?.networks],
+  );
+
+  // ── Counts for badges ──
+
+  const svcCount = definition?.services ? Object.keys(definition.services).length : 0;
+  const volCount = definition?.volumes ? Object.keys(definition.volumes).length : 0;
+  const netCount = definition?.networks ? Object.keys(definition.networks).length : 0;
+  const cfgCount = definition?.configs ? Object.keys(definition.configs).length : 0;
+  const secCount = definition?.secrets ? Object.keys(definition.secrets).length : 0;
+  const envCount = envFiles.length;
+
+  // ── Compose content for preview/raw ──
+
+  const composeContent = (
+    <div>
+      {!yamlValid && mode === 'raw' && yamlErrors.length > 0 && (
+        <Alert type="error" icon={<CloseCircleOutlined />}
+          message={<ul style={{ margin: 0, paddingLeft: 16 }}>{yamlErrors.map((e, i) => <li key={i}>{e}</li>)}</ul>}
+          style={{ marginBottom: 8 }} showIcon />
+      )}
+      <YamlEditor value={compose} onChange={(v) => setCompose(v)}
+        onValidate={(isValid, errors) => { setYamlValid(isValid); setYamlErrors(errors); }}
+        height={Math.min(500, window.innerHeight - 350)} />
+    </div>
+  );
+
+  // ── Visual editor for each section ──
+
+  const visualServices = definition ? (
+    <ServiceList value={definition.services} onChange={handleServicesChange}
+      volumeNames={volumeNames} networkNames={networkNames} />
+  ) : composeContent;
+
+  const visualVolumes = definition ? (
+    <VolumeList value={definition.volumes ?? {}} onChange={handleVolumesChange} />
+  ) : composeContent;
+
+  const visualNetworks = definition ? (
+    <NetworkList value={definition.networks ?? {}} onChange={handleNetworksChange} />
+  ) : composeContent;
+
+  const visualConfigs = definition ? (
+    <ConfigSecretList title="Configs" value={definition.configs ?? {}} onChange={handleConfigsChange} />
+  ) : composeContent;
+
+  const visualSecrets = definition ? (
+    <ConfigSecretList title="Secrets" value={definition.secrets ?? {}} onChange={handleSecretsChange} />
+  ) : composeContent;
+
+  // ── Loading ──
+
   if (loading) return <Spin size="large" style={{ display: 'block', margin: '40px auto' }} />;
   if (!stack) return null;
+
+  // ── Tab items — dynamic based on mode ──
+
+  // Always present: Logs, Notifiers
+  const commonTabs = [
+    {
+      key: 'logs',
+      label: '📋 Logs',
+      children: (
+        <div style={{ padding: '12px 12px 0' }}>
+          <Terminal stackId={stack.id} stackName={stack.name} height={Math.min(500, window.innerHeight - 250)} />
+        </div>
+      ),
+    },
+    {
+      key: 'notifiers',
+      label: '📢 Notifiers',
+      children: (
+        <div style={{ padding: '12px 12px 0' }}>
+          {notifiers.length === 0 ? <Text type="secondary">No notifiers configured</Text> : (
+            <Space wrap>
+              {notifiers.map((n) => (
+                <Tag key={n.id} color={stackNotifiers.includes(n.id) ? 'blue' : 'default'}
+                  style={{ cursor: 'pointer' }}
+                  onClick={async () => {
+                    const current = await api.getStackNotifiers(stack.id);
+                    const updated = current.includes(n.id)
+                      ? current.filter((x: string) => x !== n.id)
+                      : [...current, n.id];
+                    await api.setStackNotifiers(stack.id, updated);
+                    setStackNotifiers(updated);
+                  }}>
+                  {n.name} ({n.notifier_type})
+                </Tag>
+              ))}
+            </Space>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  // ── Tab items — conditional on mode ──
+
+  const sectionContent = (key: string) => {
+    if (mode === 'visual' && definition) {
+      switch (key) {
+        case 'services': return <div style={{ padding: '12px 12px 0' }}>{visualServices}</div>;
+        case 'volumes': return <div style={{ padding: '12px 12px 0' }}>{visualVolumes}</div>;
+        case 'networks': return <div style={{ padding: '12px 12px 0' }}>{visualNetworks}</div>;
+        case 'configs': return <div style={{ padding: '12px 12px 0' }}>{visualConfigs}</div>;
+        case 'secrets': return <div style={{ padding: '12px 12px 0' }}>{visualSecrets}</div>;
+      }
+    }
+    return <div style={{ padding: '12px 12px 0' }}>{composeContent}</div>;
+  };
+
+  const envTab = {
+    key: 'env',
+    label: <span>🔤 Env Files <Tag style={{ fontSize: 10, marginLeft: 4 }}>{envCount}</Tag></span>,
+    children: (
+      <div style={{ padding: '12px 12px 0' }}>
+        <EnvFileList value={envFiles}
+          mode={mode}
+          onUpsert={async (filename, content) => { if (!id) return; await api.upsertEnvFile(id, filename, content); loadEnvFiles(); }}
+          onDelete={async (filename) => { if (!id) return; await api.deleteEnvFile(id, filename); loadEnvFiles(); }} />
+      </div>
+    ),
+  };
+
+  // In Visual mode: show all compose sections
+  // In Preview/Raw mode: only Services + Env Files
+  const composeTabs = mode === 'visual' && definition
+    ? [
+        {
+          key: 'services',
+          label: <span>🐳 Services <Tag style={{ fontSize: 10, marginLeft: 4 }}>{svcCount}</Tag></span>,
+          children: sectionContent('services'),
+        },
+        {
+          key: 'volumes',
+          label: <span>💾 Volumes <Tag style={{ fontSize: 10, marginLeft: 4 }}>{volCount}</Tag></span>,
+          children: sectionContent('volumes'),
+        },
+        {
+          key: 'networks',
+          label: <span>🌐 Networks <Tag style={{ fontSize: 10, marginLeft: 4 }}>{netCount}</Tag></span>,
+          children: sectionContent('networks'),
+        },
+        {
+          key: 'configs',
+          label: <span>⚙️ Configs <Tag style={{ fontSize: 10, marginLeft: 4 }}>{cfgCount}</Tag></span>,
+          children: sectionContent('configs'),
+        },
+        {
+          key: 'secrets',
+          label: <span>🔒 Secrets <Tag style={{ fontSize: 10, marginLeft: 4 }}>{secCount}</Tag></span>,
+          children: sectionContent('secrets'),
+        },
+        envTab,
+      ]
+    : [
+        {
+          key: 'services',
+          label: '🐳 Services',
+          children: <div style={{ padding: '12px 12px 0' }}>{composeContent}</div>,
+        },
+        envTab,
+      ];
+
+  const tabItems = [...composeTabs, ...commonTabs];
 
   // ── More actions dropdown ──
   const moreItems = [
@@ -219,7 +479,6 @@ export function StackDetail() {
           {stack.status}
         </Tag>
 
-        {/* Actions: icon-only always, less-used in dropdown */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
           <Button size="small" type="primary" icon={<PlayCircleOutlined />} onClick={() => handleAction('start')} disabled={stack.status === 'running'} />
           <Button size="small" icon={<StopOutlined />} onClick={() => handleAction('stop')} disabled={stack.status !== 'running'} />
@@ -238,7 +497,7 @@ export function StackDetail() {
       </Header>
 
       <Content style={{ padding: 12, background: darkMode ? '#000' : undefined }}>
-        {/* Info Card — siempre visible */}
+        {/* Info Card */}
         <Card size="small" styles={{ body: { padding: '8px 12px' } }} style={{ marginBottom: 12 }}>
           <Descriptions column={{ xs: 1, sm: 3 }} size="small" style={{ marginBottom: 0 }}>
             <Descriptions.Item label="ID"><Text copyable={{ text: stack.id }} style={{ fontSize: 12 }}>{stack.id.substring(0, 8)}…</Text></Descriptions.Item>
@@ -249,372 +508,81 @@ export function StackDetail() {
             <Descriptions.Item label="Description">{stack.description || '—'}</Descriptions.Item>
             <Descriptions.Item label="Created">{new Date(stack.created_at).toLocaleString()}</Descriptions.Item>
             <Descriptions.Item label="Updated">{new Date(stack.updated_at).toLocaleString()}</Descriptions.Item>
+            <Descriptions.Item label="Last Started">
+              {stats ? (stats.last_started_at ? new Date(stats.last_started_at).toLocaleString() : 'Never') : '…'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Total Running">
+              {stats
+                ? stats.total_running_seconds > 0
+                  ? `${Math.floor(stats.total_running_seconds / 3600)}h ${Math.floor((stats.total_running_seconds % 3600) / 60)}m`
+                  : '0m'
+                : '…'}
+            </Descriptions.Item>
           </Descriptions>
         </Card>
 
+        {/* Mode selector + Save buttons */}
+        <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <Segmented
+            size="small"
+            value={mode}
+            onChange={(v) => {
+              setMode(v as 'raw' | 'visual');
+            }}
+            options={[
+              { label: '📝 Raw', value: 'raw' },
+              { label: '🎨 Visual', value: 'visual' },
+            ]}
+          />
+          {hasChanges && <Tag color="orange">unsaved</Tag>}
+          <Space style={{ marginLeft: 'auto' }}>
+            {mode === 'raw' && (
+              <Button size="small" onClick={handleValidateSyntax} icon={<CheckCircleOutlined />}>
+                Validate
+              </Button>
+            )}
+            <Button size="small" type="primary" onClick={handleSaveCompose} loading={saving} disabled={mode === 'raw' && !yamlValid}>
+              Save
+            </Button>
+            <Button size="small" type="primary" icon={<CloudUploadOutlined />} onClick={handleDeploy} loading={deploying} disabled={mode === 'raw' && !yamlValid}>
+              Save & Deploy
+            </Button>
+          </Space>
+        </div>
+
+        {/* Tabs — flattened */}
         <Card styles={{ body: { padding: 12 } }}>
           <Tabs
-            defaultActiveKey="compose"
+            defaultActiveKey="services"
             size="small"
+            type="card"
             style={{ margin: '-12px' }}
-            items={[
-              {
-                key: 'compose',
-                label: '📄 Compose',
-                children: (
-                  <div style={{ padding: '12px 12px 0' }}>
-                    <Space style={{ marginBottom: 12 }}>
-                      <Switch
-                        checkedChildren={<><CheckCircleOutlined /> Edit</>}
-                        unCheckedChildren="Preview"
-                        size="small"
-                        checked={editMode}
-                        onChange={(v) => {
-                          if (!v && hasChanges && yamlValid) {
-                            handleSaveCompose();
-                          }
-                          setEditMode(v);
-                        }}
-                      />
-                      {hasChanges && <Tag color="orange">unsaved</Tag>}
-                    </Space>
-
-                    {!yamlValid && editMode && yamlErrors.length > 0 && (
-                      <Alert
-                        type="error"
-                        icon={<CloseCircleOutlined />}
-                        message={
-                          <ul style={{ margin: 0, paddingLeft: 16 }}>
-                            {yamlErrors.map((e, i) => <li key={i}>{e}</li>)}
-                          </ul>
-                        }
-                        style={{ marginBottom: 8 }}
-                        showIcon
-                      />
-                    )}
-
-                    {editMode ? (
-                      <YamlEditor
-                        value={compose}
-                        onChange={(v) => setCompose(v)}
-                        onValidate={(isValid, errors) => {
-                          setYamlValid(isValid);
-                          setYamlErrors(errors);
-                        }}
-                        height={Math.min(500, window.innerHeight - 350)}
-                      />
-                    ) : (
-                      <pre style={{
-                        background: '#1e1e1e',
-                        color: '#d4d4d4',
-                        padding: 12,
-                        borderRadius: 6,
-                        overflow: 'auto',
-                        maxHeight: Math.min(400, window.innerHeight - 300),
-                        fontSize: 12,
-                        margin: 0,
-                      }}>
-                        {compose}
-                      </pre>
-                    )}
-
-                    {editMode && (
-                      <div style={{
-                        display: 'flex', gap: 8, marginTop: 12,
-                        flexDirection: isMobile() ? 'column' : 'row',
-                      }}>
-                        <Button size="small" onClick={handleValidateSyntax} icon={<CheckCircleOutlined />} block={isMobile()}>
-                          Validate
-                        </Button>
-                        <Button size="small" type="primary" onClick={handleSaveCompose} loading={saving} disabled={!yamlValid} block={isMobile()}>
-                          Save
-                        </Button>
-                        <Button size="small" type="primary" icon={<CloudUploadOutlined />} onClick={handleDeploy} loading={deploying} block={isMobile()}>
-                          Save & Deploy
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Env Files — dentro del mismo tab */}
-                    <Divider style={{ marginTop: 16, marginBottom: 12 }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <Text strong style={{ fontSize: 13 }}>🔤 Environment Files</Text>
-                      <Button size="small" type="primary" onClick={() => {
-                        setEnvFilename('.env'); setEnvContent(''); setNotifierModalOpen(true);
-                      }}>Add .env</Button>
-                    </div>
-                    {envFiles.length === 0 ? <Text type="secondary" style={{ fontSize: 13 }}>No env files</Text> : (
-                      <Space wrap>
-                        {envFiles.map((env) => (
-                          <Tag key={env.id} closable onClose={async () => {
-                            await api.deleteEnvFile(stack.id, env.filename);
-                            loadEnvFiles();
-                          }} style={{ cursor: 'pointer' }} onClick={() => {
-                            setEnvFilename(env.filename);
-                            setEnvContent(env.content);
-                            setNotifierModalOpen(true);
-                          }}>
-                            {env.filename}
-                          </Tag>
-                        ))}
-                      </Space>
-                    )}
-                  </div>
-                ),
-              },
-              {
-                key: 'logs',
-                label: '📋 Logs',
-                children: (
-                  <div style={{ padding: '12px 12px 0' }}>
-                    <Terminal stackId={stack.id} stackName={stack.name} height={Math.min(500, window.innerHeight - 250)} />
-                  </div>
-                ),
-              },
-              {
-                key: 'stats',
-                label: '📊 Stats',
-                children: (
-                  <div style={{ padding: '12px 12px 0' }}>
-                    {stats ? (
-                      <Descriptions column={{ xs: 1, sm: 2 }} size="small">
-                        <Descriptions.Item label="Last Started">
-                          {stats.last_started_at ? new Date(stats.last_started_at).toLocaleString() : 'Never'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Total Running">
-                          {stats.total_running_seconds > 0
-                            ? `${Math.floor(stats.total_running_seconds / 3600)}h ${Math.floor((stats.total_running_seconds % 3600) / 60)}m`
-                            : '0m'}
-                        </Descriptions.Item>
-                      </Descriptions>
-                    ) : <Text type="secondary">No stats available</Text>}
-                  </div>
-                ),
-              },
-              {
-                key: 'notifiers',
-                label: '📢 Notifiers',
-                children: (
-                  <div style={{ padding: '12px 12px 0' }}>
-                    {notifiers.length === 0 ? <Text type="secondary">No notifiers configured</Text> : (
-                      <Space wrap>
-                        {notifiers.map((n) => (
-                          <Tag
-                            key={n.id}
-                            color={stackNotifiers.includes(n.id) ? 'blue' : 'default'}
-                            style={{ cursor: 'pointer' }}
-                            onClick={async () => {
-                              const current = await api.getStackNotifiers(stack.id);
-                              const updated = current.includes(n.id)
-                                ? current.filter((x: string) => x !== n.id)
-                                : [...current, n.id];
-                              await api.setStackNotifiers(stack.id, updated);
-                              setStackNotifiers(updated);
-                            }}
-                          >
-                            {n.name} ({n.notifier_type})
-                          </Tag>
-                        ))}
-                      </Space>
-                    )}
-                  </div>
-                ),
-              },
-            ]}
+            items={tabItems}
           />
         </Card>
 
-        <Modal
-          title="⚙️ Git Sync Configuration"
-          open={syncModalOpen}
-          onCancel={() => setSyncModalOpen(false)}
-          footer={null}
-          width={500}
-        >
-          <SyncConfigForm
-            stackId={stack.id}
-            stackName={stack.name}
-            config={syncConfig}
-            onSaved={() => {
-              setSyncModalOpen(false);
-              id && api.getSyncConfig(id).then(setSyncConfig).catch(() => {});
-            }}
-          />
-        </Modal>
-
-        <Modal
-          title={`🔤 Edit ${envFilename}`}
-          open={notifierModalOpen}
-          onCancel={() => setNotifierModalOpen(false)}
-          onOk={async () => {
-            if (!id) return;
-            await api.upsertEnvFile(id, envFilename, envContent);
-            setNotifierModalOpen(false);
-            loadEnvFiles();
-          }}
-          width={600}
-        >
-          <div style={{ marginBottom: 8 }}>
-            <label>Filename:</label>
-            <input value={envFilename} onChange={(e) => setEnvFilename(e.target.value)}
-              style={{ width: '100%', padding: '4px 8px', borderRadius: 4, border: '1px solid #d9d9d9', fontSize: 14 }}
-            />
-          </div>
-          <textarea value={envContent} onChange={(e) => setEnvContent(e.target.value)}
-            rows={10}
-            style={{ width: '100%', fontFamily: 'monospace', fontSize: 13, padding: 8, borderRadius: 4, border: '1px solid #d9d9d9' }}
-            placeholder="DB_HOST=localhost&#10;DB_PORT=5432"
-          />
-        </Modal>
-
-        <Modal
-          title="📊 Git Diff"
-          open={diffModalOpen}
-          onCancel={() => setDiffModalOpen(false)}
-          footer={null}
-          width={800}
-        >
-          {diffData && (
-            <>
-              <Space style={{ marginBottom: 8 }}>
-                <Tag>{diffData.files_changed?.length || 0} files changed</Tag>
-                <Tag color="green">+{diffData.additions || 0}</Tag>
-                <Tag color="red">-{diffData.deletions || 0}</Tag>
+        {/* Modals */}
+        <Modal title="⚙️ Git Sync Configuration" open={syncModalOpen} onCancel={() => setSyncModalOpen(false)} footer={null}>
+          {syncConfig && (
+            <div>
+              <Descriptions column={1} size="small">
+                <Descriptions.Item label="Type">{syncConfig.sync_type}</Descriptions.Item>
+                <Descriptions.Item label="Repo URL">{syncConfig.remote_url}</Descriptions.Item>
+                <Descriptions.Item label="Branch">{syncConfig.remote_branch}</Descriptions.Item>
+                <Descriptions.Item label="Status">{syncConfig.status}</Descriptions.Item>
+              </Descriptions>
+              <Space style={{ marginTop: 12 }}>
+                <Button size="small" onClick={async () => { if (!id) return; await api.syncPull(id); message.success('Pulled'); }}>Pull</Button>
+                <Button size="small" onClick={async () => { if (!id) return; await api.syncPush(id); message.success('Pushed'); }}>Push</Button>
               </Space>
-              <DiffViewer diffText={diffData.diff_text || ''} height={400} />
-            </>
+            </div>
           )}
+        </Modal>
+
+        <Modal title="📝 Diff" open={diffModalOpen} onCancel={() => setDiffModalOpen(false)} width={800} footer={null}>
+          {diffData && <DiffViewer diffText={diffData?.diff || ''} />}
         </Modal>
       </Content>
     </Layout>
-  );
-}
-
-// ───── Sync Config Form ─────
-
-function SyncConfigForm({ stackId, stackName, config, onSaved }: {
-  stackId: string;
-  stackName: string;
-  config: StackSync | null;
-  onSaved: () => void;
-}) {
-  const [syncType, setSyncType] = useState(config?.sync_type || 'none');
-  const [remoteUrl, setRemoteUrl] = useState(config?.remote_url || '');
-  const [remoteBranch, setRemoteBranch] = useState(config?.remote_branch || 'main');
-  const [authToken, setAuthToken] = useState('');
-  const [syncing, setSyncing] = useState(false);
-  const [pulling, setPulling] = useState(false);
-  const { message } = AntApp.useApp();
-
-  const handleSave = async () => {
-    try {
-      setSyncing(true);
-      await api.setSyncConfig(stackId, {
-        sync_type: syncType,
-        remote_url: remoteUrl || undefined,
-        remote_branch: remoteBranch || 'main',
-        auth_token: authToken || undefined,
-      });
-      message.success(`Sync config saved for '${stackName}'`);
-      onSaved();
-    } catch (e: any) {
-      message.error('Error: ' + e.message);
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const handlePull = async () => {
-    try {
-      setPulling(true);
-      const result = await api.syncPull(stackId);
-      message.success('🔽 ' + result.message);
-      onSaved();
-    } catch (e: any) {
-      message.error('Pull failed: ' + e.message);
-    } finally {
-      setPulling(false);
-    }
-  };
-
-  const handlePush = async () => {
-    try {
-      const result = await api.syncPush(stackId);
-      message.success('🔼 ' + result.message);
-      onSaved();
-    } catch (e: any) {
-      message.error('Push failed: ' + e.message);
-    }
-  };
-
-  return (
-    <Space direction="vertical" style={{ width: '100%' }}>
-      <div>
-        <label style={{ display: 'block', marginBottom: 4 }}>Sync Type</label>
-        <select
-          value={syncType}
-          onChange={(e) => setSyncType(e.target.value)}
-          style={{
-            width: '100%', padding: '4px 8px',
-            borderRadius: 4, border: '1px solid #d9d9d9', fontSize: 14,
-          }}
-        >
-          <option value="none">None</option>
-          <option value="git_dir">Local Git (no remote)</option>
-          <option value="git_remote">Remote Git</option>
-        </select>
-      </div>
-
-      {syncType === 'git_remote' && (
-        <>
-          <InputField label="Remote URL" value={remoteUrl} onChange={setRemoteUrl} placeholder="https://github.com/user/repo.git" />
-          <InputField label="Branch" value={remoteBranch} onChange={setRemoteBranch} placeholder="main" />
-          <InputField label="Auth Token (optional)" value={authToken} onChange={setAuthToken} placeholder="ghp_xxx..." type="password" />
-        </>
-      )}
-
-      <Space style={{ marginTop: 8 }} wrap>
-        <Button type="primary" onClick={handleSave} loading={syncing}>
-          Save Config
-        </Button>
-        {syncType === 'git_remote' && (
-          <>
-            <Button onClick={handlePull} loading={pulling}>Pull</Button>
-            <Button onClick={handlePush}>Push</Button>
-          </>
-        )}
-      </Space>
-
-      {config && config.last_commit && (
-        <div style={{ marginTop: 8, fontSize: 12, color: '#888' }}>
-          Last commit: <code>{config.last_commit.substring(0, 12)}</code>
-          {config.last_synced_at && ` | ${new Date(config.last_synced_at).toLocaleString()}`}
-        </div>
-      )}
-    </Space>
-  );
-}
-
-function InputField({ label, value, onChange, placeholder, type = 'text' }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  type?: string;
-}) {
-  return (
-    <div>
-      <label style={{ display: 'block', marginBottom: 4 }}>{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{
-          width: '100%', padding: '4px 8px',
-          borderRadius: 4, border: '1px solid #d9d9d9', fontSize: 14,
-        }}
-      />
-    </div>
   );
 }
