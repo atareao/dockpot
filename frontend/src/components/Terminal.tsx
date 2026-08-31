@@ -3,6 +3,28 @@ import { Button, Space, Tag } from 'antd';
 import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
 import { connectSSE } from '../api/http';
 
+// ── Scrollbar styles (matching TemplateBrowser) ──
+const SCROLL_STYLE = `
+.dp-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.dp-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dp-scroll::-webkit-scrollbar-thumb {
+  background: rgba(128,128,128,0.25);
+  border-radius: 4px;
+}
+.dp-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(128,128,128,0.4);
+}
+.dp-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128,128,128,0.25) transparent;
+}
+`;
+
 interface TerminalProps { stackId: string; stackName: string; height?: string | number; }
 
 function colorizeLine(line: string): React.ReactNode {
@@ -86,7 +108,8 @@ export function Terminal({ stackId, stackName, height = 400 }: TerminalProps) {
         <Button size="small" onClick={() => { setLines([]); lineBuffer.current = []; }}>Clear</Button>
         <Tag>{lines.length} lines</Tag>
       </Space>
-      <div ref={containerRef} style={{
+      <style>{SCROLL_STYLE}</style>
+      <div ref={containerRef} className="dp-scroll" style={{
         background: '#0d1117', padding: 12, borderRadius: 6, overflow: 'auto', height,
         whiteSpace: 'pre-wrap', wordBreak: 'break-all',
       }}>
