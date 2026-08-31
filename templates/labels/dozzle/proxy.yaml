@@ -1,0 +1,19 @@
+name: dozzle-proxy
+description: "Dozzle proxy labels (Traefik)"
+category: "dozzle"
+labels:
+  traefik.enable: "true"
+  traefik.http.routers.${SERVICE_NAME}.rule: "Host(`${HOSTNAME}`)"
+  traefik.http.routers.${SERVICE_NAME}.entrypoints: "websecure"
+  traefik.http.routers.${SERVICE_NAME}.tls: "true"
+  traefik.http.routers.${SERVICE_NAME}.tls.certresolver: "letsencrypt"
+  traefik.http.services.${SERVICE_NAME}.loadbalancer.server.port: "${PORT}"
+variables:
+  - name: HOSTNAME
+    description: "Dozzle domain"
+    default: "dozzle.example.com"
+    required: true
+  - name: PORT
+    description: "Container port"
+    default: "8080"
+    required: true

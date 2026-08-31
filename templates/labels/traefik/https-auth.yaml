@@ -1,0 +1,25 @@
+name: traefik-https-auth
+description: "HTTPS route with TLS and Basic Auth"
+category: "traefik"
+labels:
+  traefik.enable: "true"
+  traefik.http.routers.${SERVICE_NAME}.rule: "Host(`${HOSTNAME}`)"
+  traefik.http.routers.${SERVICE_NAME}.entrypoints: "websecure"
+  traefik.http.routers.${SERVICE_NAME}.tls: "true"
+  traefik.http.routers.${SERVICE_NAME}.tls.certresolver: "letsencrypt"
+  traefik.http.routers.${SERVICE_NAME}.middlewares: "${SERVICE_NAME}-auth"
+  traefik.http.middlewares.${SERVICE_NAME}-auth.basicauth.users: "${AUTH_USERS}"
+  traefik.http.services.${SERVICE_NAME}.loadbalancer.server.port: "${PORT}"
+variables:
+  - name: HOSTNAME
+    description: "Domain name"
+    default: "example.com"
+    required: true
+  - name: PORT
+    description: "Container port"
+    default: "80"
+    required: true
+  - name: AUTH_USERS
+    description: "Basic auth users (user:password hash)"
+    default: "admin:$2y$10$..."
+    required: true

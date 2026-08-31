@@ -1,0 +1,20 @@
+name: caddy-api-proxy
+description: "Caddy API proxy with path prefix"
+category: "caddy"
+labels:
+  caddy: "${HOSTNAME}"
+  caddy.handle_path: "${PATH_PREFIX}/*"
+  caddy.handle_path.reverse_proxy: "{{upstreams ${PORT}}}"
+variables:
+  - name: HOSTNAME
+    description: "Domain name"
+    default: "api.example.com"
+    required: true
+  - name: PORT
+    description: "Container port"
+    default: "80"
+    required: true
+  - name: PATH_PREFIX
+    description: "API path prefix"
+    default: "/api"
+    required: true
