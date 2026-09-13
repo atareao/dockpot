@@ -50,7 +50,7 @@ RUN touch src/main.rs src/lib.rs && \
 # ═══════════════════════════════════════════════════════════════
 # Stage 3: Runtime
 # ═══════════════════════════════════════════════════════════════
-FROM alpine:3.23
+FROM docker.io/library/alpine:3.23
 
 RUN apk add --no-cache \
     ca-certificates \
