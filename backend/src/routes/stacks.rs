@@ -8,6 +8,96 @@ use crate::git;
 use crate::models::{CreateStackRequest, UpdateStackRequest};
 use crate::state::AppState;
 
+/// Prepare compose content for Docker by resolving relative volume paths,
+/// rewriting paths to host-accessible locations, and ensuring volume
+/// directories exist on disk.
+///
+/// This function handles two cases:
+/// 1. Volume paths containing `/app/stacks/` are rewritten to the host path
+///    via `crate::db::rewrite_stacks_paths`.
+/// 2. Relative volume paths (e.g. `./data` or `data`) are resolved against
+///    `stack_path`, directories are created, and the compose is rewritten so
+///    that the bind-mount source becomes `stacks_host_path/<stack-uuid>/<path>`.
+pub async fn prepare_compose_for_docker(
+    compose: &str,
+    stack_path: &str,
+    stacks_host_path: &str,
+) -> Result<String, String> {
+    let stack_dir = std::path::Path::new(stack_path)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+
+    // Step 1: Resolve relative volume paths → make them absolute under stack_path,
+    // create directories, and rewrite the compose string so the source becomes
+    // stacks_host_path/<uuid>/<relative>.
+    let mut rewritten = compose.to_string();
+    let stack_path_pb = std::path::PathBuf::from(stack_path);
+
+    if let Ok(yaml) = serde_yaml::from_str::<serde_yaml::Value>(compose) {
+        if let Some(services) = yaml.get("services").and_then(|s| s.as_mapping()) {
+            for (_name, config) in services {
+                if let Some(volumes) = config.get("volumes").and_then(|v| v.as_sequence()) {
+                    for vol in volumes {
+                        let vol_str = if let Some(s) = vol.as_str() {
+                            s.to_string()
+                        } else {
+                            continue;
+                        };
+
+                        // Short-syntax: source:destination[:mode]
+                        let source = vol_str.split(':').next().unwrap_or("").to_string();
+                        if source.is_empty() {
+                            continue;
+                        }
+
+                        // Skip absolute paths and named volumes (no colon in source)
+                        let is_named = !source.contains('/') && !source.starts_with('.');
+                        if source.starts_with('/') || is_named {
+                            continue;
+                        }
+
+                        // Relative path — resolve against stack_path and create dir
+                        let relative_clean = source.trim_start_matches("./");
+                        let abs_source = stack_path_pb.join(relative_clean);
+                        tokio::fs::create_dir_all(&abs_source).await.map_err(|e| {
+                            format!(
+                                "Failed to create volume directory '{}': {}",
+                                abs_source.display(),
+                                e
+                            )
+                        })?;
+
+                        // Build the host-side path: stacks_host_path/<uuid>/<relative>
+                        let host_source = format!(
+                            "{}/{}/{}",
+                            stacks_host_path.trim_end_matches('/'),
+                            stack_dir,
+                            relative_clean,
+                        );
+
+                        // Replace in compose string (match the full vol entry)
+                        let new_vol = vol_str.replacen(&source, &host_source, 1);
+                        rewritten = rewritten.replace(&vol_str, &new_vol);
+                    }
+                }
+            }
+        }
+    }
+
+    // Step 2: Also run rewrite_stacks_paths for any remaining /app/stacks/
+    // references that weren't resolved by the relative-path scan above.
+    rewritten = crate::db::rewrite_stacks_paths(&rewritten, stacks_host_path);
+
+    // Step 3: Use ensure_volume_dirs to catch any volumes that were already
+    // absolute under /app/stacks/.
+    crate::db::ensure_volume_dirs(stack_path, &rewritten)
+        .await
+        .map_err(|e| format!("Failed to create volume directories: {}", e))?;
+
+    Ok(rewritten)
+}
+
 /// Auto-commit changes if the stack has git sync enabled
 async fn auto_commit(state: &AppState, id: &str, message: &str) {
     if let Ok(Some(sync)) = state.db.get_sync_config(id).await {
@@ -537,6 +627,34 @@ pub async fn start(
 
     let compose_path = format!("{}/compose.yaml", stack.path);
 
+    // Read compose from disk and rewrite paths for Docker host access
+    let compose_content = tokio::fs::read_to_string(&compose_path)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to read compose file: {}", e),
+            )
+        })?;
+
+    let rewritten = prepare_compose_for_docker(
+        &compose_content,
+        &stack.path,
+        &state.config.stacks_host_path.to_string_lossy(),
+    )
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+
+    // Write rewritten compose back to disk
+    tokio::fs::write(&compose_path, &rewritten)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to write compose file: {}", e),
+            )
+        })?;
+
     // Run docker compose up -d
     let output = tokio::process::Command::new("docker")
         .args(["compose", "-f", &compose_path, "up", "-d"])
@@ -834,4 +952,86 @@ pub async fn dashboard_status(
     })?;
 
     Ok(Json(serde_json::json!(status)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    /// Helper: build a minimal compose YAML with a single bind mount volume.
+    fn compose_with_volume(volume_line: &str) -> String {
+        format!(
+            r#"version: '3'
+services:
+  web:
+    image: nginx
+    volumes:
+      - {}"#,
+            volume_line
+        )
+    }
+
+    #[tokio::test]
+    async fn test_prepare_compose_for_docker_rewrites_paths() {
+        let tmp = std::env::temp_dir().join("dockpot-test-prepare-rewrites");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let stack_path = tmp.join("uuid-123").to_string_lossy().to_string();
+        let stacks_host_path = "/var/lib/dockpot/stacks";
+        let compose = compose_with_volume("./nginx/conf.d:/etc/nginx/conf.d");
+
+        let result = prepare_compose_for_docker(&compose, &stack_path, stacks_host_path)
+            .await
+            .expect("prepare_compose_for_docker should succeed");
+
+        assert!(
+            result.contains("/var/lib/dockpot/stacks/uuid-123/nginx/conf.d:/etc/nginx/conf.d"),
+            "Expected rewritten path in compose, got: {}",
+            result
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[tokio::test]
+    async fn test_prepare_compose_for_docker_creates_dirs() {
+        let tmp = std::env::temp_dir().join("dockpot-test-prepare-creates-dirs");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let stack_path = tmp.join("uuid-456").to_string_lossy().to_string();
+        let stacks_host_path = "/var/lib/dockpot/stacks";
+        let compose = compose_with_volume("./nginx/conf.d:/etc/nginx/conf.d");
+
+        let _result = prepare_compose_for_docker(&compose, &stack_path, stacks_host_path)
+            .await
+            .expect("prepare_compose_for_docker should succeed");
+
+        let expected_dir = PathBuf::from(&stack_path).join("nginx/conf.d");
+        assert!(
+            expected_dir.exists(),
+            "Directory {:?} should exist after prepare_compose_for_docker",
+            expected_dir
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[tokio::test]
+    async fn test_prepare_compose_for_docker_no_volumes() {
+        let tmp = std::env::temp_dir().join("dockpot-test-prepare-no-volumes");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let stack_path = tmp.join("uuid-789").to_string_lossy().to_string();
+        let stacks_host_path = "/var/lib/dockpot/stacks";
+        let compose = r#"version: '3'
+services:
+  web:
+    image: nginx"#;
+
+        let result = prepare_compose_for_docker(compose, &stack_path, stacks_host_path)
+            .await
+            .expect("prepare_compose_for_docker should succeed");
+
+        assert_eq!(
+            result, compose,
+            "Compose without volumes should not be modified"
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
 }

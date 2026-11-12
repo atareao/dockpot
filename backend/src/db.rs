@@ -13,6 +13,67 @@ pub struct Database {
     stacks_dir: String,
 }
 
+/// Rewrite /app/stacks/ paths to use the host-accessible path.
+/// This is needed because Docker daemon runs on the host and cannot resolve
+/// /app/stacks/ paths that only exist inside the container.
+pub fn rewrite_stacks_paths(compose: &str, stacks_host_path: &str) -> String {
+    compose.replace(
+        "/app/stacks/",
+        &format!("{}/", stacks_host_path.trim_end_matches('/')),
+    )
+}
+
+/// Parse a compose YAML and create all directories needed for bind mount volumes
+/// whose source path contains "/app/stacks/".
+pub async fn ensure_volume_dirs(stack_path: &str, compose: &str) -> std::io::Result<()> {
+    if compose.trim().is_empty() {
+        return Ok(());
+    }
+
+    // Parse the YAML to find volume definitions
+    if let Ok(yaml) = serde_yaml::from_str::<serde_yaml::Value>(compose) {
+        if let Some(services) = yaml.get("services").and_then(|s| s.as_mapping()) {
+            for (_name, config) in services {
+                if let Some(volumes) = config.get("volumes").and_then(|v| v.as_sequence()) {
+                    for vol in volumes {
+                        let vol_str = if let Some(s) = vol.as_str() {
+                            s.to_string()
+                        } else if let Some(m) = vol.as_mapping() {
+                            // Long syntax: check "source" field
+                            m.get("source")
+                                .and_then(|s| s.as_str())
+                                .map(|s| s.to_string())
+                                .unwrap_or_default()
+                        } else {
+                            continue;
+                        };
+
+                        // Extract the source path (before the first colon)
+                        let source = vol_str.split(':').next().unwrap_or("").to_string();
+                        if source.contains("/app/stacks/") {
+                            // Resolve relative to stack_path. The source is
+                            // /app/stacks/<stack-id>/<subpath>, and stack_path
+                            // already includes <stack-id>, so skip that component.
+                            let dir = if let Some(relative) = source.strip_prefix("/app/stacks/") {
+                                let relative_path = std::path::Path::new(relative);
+                                let subpath: std::path::PathBuf =
+                                    relative_path.components().skip(1).collect();
+                                std::path::PathBuf::from(stack_path).join(subpath)
+                            } else if source.starts_with('/') {
+                                std::path::PathBuf::from(&source)
+                            } else {
+                                std::path::PathBuf::from(stack_path).join(&source)
+                            };
+                            tokio::fs::create_dir_all(&dir).await?;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 impl Database {
     pub async fn open(path: &Path, stacks_dir: &Path) -> Result<Self> {
         if let Some(parent) = path.parent() {
@@ -866,5 +927,148 @@ impl Database {
         .await
         .ok();
         Ok(output_path.to_string_lossy().to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rewrite_stacks_paths_rewrites_app_stacks() {
+        let compose = "- /app/stacks/uuid-123/nginx/conf.d:/etc/nginx/conf.d:ro";
+        let result = rewrite_stacks_paths(compose, "/var/lib/dockpot/stacks");
+        assert_eq!(
+            result,
+            "- /var/lib/dockpot/stacks/uuid-123/nginx/conf.d:/etc/nginx/conf.d:ro"
+        );
+    }
+
+    #[test]
+    fn test_rewrite_stacks_paths_ignores_other_paths() {
+        let compose = "- /data/external:/data:rw";
+        let result = rewrite_stacks_paths(compose, "/var/lib/dockpot/stacks");
+        assert_eq!(result, compose);
+    }
+
+    #[test]
+    fn test_rewrite_stacks_paths_empty() {
+        let result = rewrite_stacks_paths("", "/var/lib/dockpot/stacks");
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_rewrite_stacks_paths_multiple_volumes() {
+        let compose = "\
+- /app/stacks/uuid-1/nginx.conf:/etc/nginx/nginx.conf:ro
+- /app/stacks/uuid-1/html:/usr/share/nginx/html:ro
+- /app/stacks/uuid-2/data:/var/lib/data:rw";
+        let result = rewrite_stacks_paths(compose, "/opt/stacks");
+        let expected = "\
+- /opt/stacks/uuid-1/nginx.conf:/etc/nginx/nginx.conf:ro
+- /opt/stacks/uuid-1/html:/usr/share/nginx/html:ro
+- /opt/stacks/uuid-2/data:/var/lib/data:rw";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_rewrite_stacks_paths_custom_host_path() {
+        let compose = "/app/stacks/uuid/data:/data";
+        let result = rewrite_stacks_paths(compose, "/opt/stacks");
+        assert_eq!(result, "/opt/stacks/uuid/data:/data");
+    }
+
+    // ───── ensure_volume_dirs ─────
+
+    #[tokio::test]
+    async fn test_ensure_volume_dirs_creates_dirs() {
+        let tmp = std::env::temp_dir().join("dockpot-test-ensure-volumes-creates-dirs");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let stack_path = tmp.join("uuid").to_string_lossy().to_string();
+        let compose = "\
+version: '3'
+services:
+  web:
+    image: nginx
+    volumes:
+      - /app/stacks/uuid/nginx/conf.d:/etc/nginx/conf.d:ro";
+        let result = ensure_volume_dirs(&stack_path, compose).await;
+        assert!(
+            result.is_ok(),
+            "ensure_volume_dirs should succeed: {:?}",
+            result
+        );
+        let expected_dir = tmp.join("uuid/nginx/conf.d");
+        assert!(
+            expected_dir.exists(),
+            "Directory {:?} should exist",
+            expected_dir
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[tokio::test]
+    async fn test_ensure_volume_dirs_no_volumes() {
+        let tmp = std::env::temp_dir().join("dockpot-test-ensure-volumes-no-volumes");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let stack_path = tmp.join("uuid").to_string_lossy().to_string();
+        let compose = "\
+version: '3'
+services:
+  web:
+    image: nginx";
+        let result = ensure_volume_dirs(&stack_path, compose).await;
+        assert!(
+            result.is_ok(),
+            "ensure_volume_dirs should succeed: {:?}",
+            result
+        );
+        // No directories should have been created aside from stack_path itself
+        assert!(
+            !tmp.join("uuid/nginx").exists(),
+            "No volume dirs should exist"
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[tokio::test]
+    async fn test_ensure_volume_dirs_empty_compose() {
+        let tmp = std::env::temp_dir().join("dockpot-test-ensure-volumes-empty");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let stack_path = tmp.join("uuid").to_string_lossy().to_string();
+        let result = ensure_volume_dirs(&stack_path, "").await;
+        assert!(
+            result.is_ok(),
+            "ensure_volume_dirs should not fail on empty compose: {:?}",
+            result
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[tokio::test]
+    async fn test_ensure_volume_dirs_nested_dirs() {
+        let tmp = std::env::temp_dir().join("dockpot-test-ensure-volumes-nested");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let stack_path = tmp.join("uuid").to_string_lossy().to_string();
+        let compose = "\
+version: '3'
+services:
+  app:
+    image: myapp
+    volumes:
+      - /app/stacks/uuid/a/b/c/d:/data";
+        let result = ensure_volume_dirs(&stack_path, compose).await;
+        assert!(
+            result.is_ok(),
+            "ensure_volume_dirs should succeed: {:?}",
+            result
+        );
+        let expected_dir = tmp.join("uuid/a/b/c/d");
+        assert!(
+            expected_dir.exists(),
+            "Nested directory {:?} should exist",
+            expected_dir
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

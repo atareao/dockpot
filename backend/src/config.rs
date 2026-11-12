@@ -14,6 +14,7 @@ pub struct Config {
     pub oidc_client_id: Option<String>,
     pub oidc_client_secret: Option<String>,
     pub oidc_redirect_url: String,
+    pub stacks_host_path: PathBuf,
 }
 
 impl Config {
@@ -31,6 +32,9 @@ impl Config {
             oidc_client_id: env_optional("OIDC_CLIENT_ID"),
             oidc_client_secret: env_optional("OIDC_CLIENT_SECRET"),
             oidc_redirect_url: env_or("OIDC_REDIRECT_URL", "http://localhost:3056/auth/callback"),
+            stacks_host_path: env_optional("STACKS_HOST_PATH")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("/var/lib/dockpot/stacks")),
         }
     }
 
@@ -127,6 +131,7 @@ mod tests {
             oidc_client_id: None,
             oidc_client_secret: None,
             oidc_redirect_url: "http://localhost:3056/auth/callback".into(),
+            stacks_host_path: "/var/lib/dockpot/stacks".into(),
         };
         assert!(config.is_dev_mode());
     }
@@ -146,7 +151,39 @@ mod tests {
             oidc_client_id: Some("client-id".into()),
             oidc_client_secret: Some("secret".into()),
             oidc_redirect_url: "http://localhost:3056/auth/callback".into(),
+            stacks_host_path: "/var/lib/dockpot/stacks".into(),
         };
         assert!(!config.is_dev_mode());
+    }
+
+    // --- stacks_host_path tests (RED phase — will fail until field is implemented) ---
+
+    #[test]
+    fn test_stacks_host_path_default() {
+        std::env::remove_var("STACKS_HOST_PATH");
+        let config = Config::load();
+        assert_eq!(
+            config.stacks_host_path,
+            PathBuf::from("/var/lib/dockpot/stacks")
+        );
+    }
+
+    #[test]
+    fn test_stacks_host_path_custom() {
+        std::env::set_var("STACKS_HOST_PATH", "/opt/mis/stacks");
+        let config = Config::load();
+        assert_eq!(config.stacks_host_path, PathBuf::from("/opt/mis/stacks"));
+        std::env::remove_var("STACKS_HOST_PATH");
+    }
+
+    #[test]
+    fn test_stacks_host_path_empty() {
+        std::env::set_var("STACKS_HOST_PATH", "");
+        let config = Config::load();
+        assert_eq!(
+            config.stacks_host_path,
+            PathBuf::from("/var/lib/dockpot/stacks")
+        );
+        std::env::remove_var("STACKS_HOST_PATH");
     }
 }
