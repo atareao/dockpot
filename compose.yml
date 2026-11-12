@@ -17,7 +17,10 @@ services:
       #
       # ── Datos ─────────────────────────────────────────────────
       - dockpot-data:/app/data
-      - dockpot-stacks:/app/stacks
+      # Bind mount en lugar de named volume: el daemon de Docker (host) necesita
+      # poder resolver las rutas de los volúmenes de los stacks.
+      # Cambia STACKS_HOST_PATH si usas otra ruta en el host.
+      - ${STACKS_HOST_PATH:-/var/lib/dockpot/stacks}:/app/stacks
       # ── Templates (override) ─────────────────────────────────
       - ./templates:/app/templates:ro
     environment:
@@ -29,6 +32,7 @@ services:
       - RUST_LOG=info
       - LOG_FORMAT=pretty
       - DOCKER_HOST=unix:///var/run/docker.sock
+      - STACKS_HOST_PATH=${STACKS_HOST_PATH:-/var/lib/dockpot/stacks}
       # ── Modo dev (sin OIDC) ──
       # Sin OIDC_ISSUER_URL → dockpot arranca en modo dev sin auth
       #
@@ -41,4 +45,3 @@ services:
 
 volumes:
   dockpot-data:
-  dockpot-stacks:
