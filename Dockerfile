@@ -8,7 +8,7 @@ RUN npm install -g pnpm@latest
 
 WORKDIR /build
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
-RUN pnpm install --ignore-scripts && pnpm rebuild esbuild
+RUN pnpm install --ignore-scripts && pnpm approve-builds esbuild && pnpm rebuild esbuild
 
 COPY frontend/ ./
 RUN CI=true pnpm build
